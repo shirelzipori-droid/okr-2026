@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import re
 from pathlib import Path
@@ -29,29 +30,63 @@ from okr_2026_default_targets import (
     SOLD_FROM_SELECTION_TARGET_NAME,
     build_default_targets_flat,
 )
-from okr_2026_dashboard import SC_APPROVAL, _load_cached_metrics
+from okr_2026_dashboard import _load_cached_metrics
 from okr_2026_validation import (
     APPROVED_LOOKER_EXPLORES,
+    ESSI_SESSION_NOTE,
     ESSI_SESSION_PAYLOAD,
     LOOKER,
     LOOKER_EXPLORE_NOT_CERTIFIED,
-    LOOKER_FIELD_ALIASES,
     LOOKER_LINKS,
-    MAINTENANCE_REVIEW_NOTE,
     MAINTENANCE_REVIEW_PAYLOAD,
     METRIC_SOURCE,
     NETSUITE_87310_KILS,
     REVIEW_TAB_METRICS,
-    SESSION_REVIEW_NOTE,
-    SOLD_FROM_SELECTION_NOTE,
     SOLD_FROM_SELECTION_PROMOTED_NAME,
     SOLD_FROM_SELECTION_VARIANTS,
     USER_VERIFIED,
     fetch_metrics,
 )
 
+# English copy for the interactive dashboard UI (embedded payload + templates).
+DASHBOARD_MAINTENANCE_REVIEW_NOTE = (
+    "IBM Store Maintenance ≠ NetSuite 87310 — current Snowflake role cannot see leaf; "
+    "dashboard values = IBM Pulse fallback. Pending reconciliation with Mgmt PL / finance."
+)
+DASHBOARD_SOLD_SELECTION_REVIEW_NOTE = (
+    "Pending your verification — approved Looker: wolt_market_exploration/wolt_market_purchases (V ✅). "
+    "Do not use wolt_market_data/wolt_market_purchases (not approved). "
+    "Pick a variant in the dashboard after your manager meeting."
+)
+DASHBOARD_SESSION_REVIEW_NOTE = (
+    f"{ESSI_SESSION_NOTE} "
+    "Snowflake: presentation.wolt_market_metrics (country row) · "
+    "Looker approved (Essi): wolt_market_venue_conversion · "
+    "Looker benchmark (deprecated): kpi_data/wolt_market_metrics."
+)
+DASHBOARD_ESSI_SVENJA_NOTE = (
+    "Svenja (May 2026): Venue Conversion has no built-in FTU/Returning split — "
+    "OKR requires separate fields from Snowflake presentation.wolt_market_metrics."
+)
+DASHBOARD_ESSI_SESSION = {
+    **ESSI_SESSION_PAYLOAD,
+    "noteHe": ESSI_SESSION_NOTE,
+    "svenjaNote": DASHBOARD_ESSI_SVENJA_NOTE,
+    "kpiDeprecatedLabel": (
+        "kpi_data/wolt_market_metrics — deprecated (Essi: do not rely on, Apr–May 2026)"
+    ),
+    "venueApprovedLabel": (
+        "wolt_market_data/wolt_market_venue_conversion — Essi: sessions + session-based CVR OK"
+    ),
+}
+DASHBOARD_MAINTENANCE_REVIEW = {
+    **MAINTENANCE_REVIEW_PAYLOAD,
+    "noteHe": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
+}
+
 ROOT = Path(__file__).resolve().parent
 OUT_HTML = ROOT / "auto_outputs" / "okr_2026_interactive_dashboard.html"
+LOGO_PATH = ROOT / "assets" / "wolt_market_logo.png"
 VALIDATION_HTML = ROOT / "auto_outputs" / "okr_2026_validation.html"
 
 DASHBOARD_MONTH_COUNT = 12
@@ -200,8 +235,6 @@ def _build_payload(actuals_snow: dict[str, list[float | None]]) -> dict:
     }
     format_map = {m: _default_format(m) for m in ALL_METRIC_NAMES}
     format_map[SOLD_FROM_SELECTION_PROMOTED_NAME] = "percent:2"
-    aliases = {k: v for k, v in LOOKER_FIELD_ALIASES.items() if k in ALL_METRIC_NAMES}
-    aliases[SOLD_FROM_SELECTION_PROMOTED_NAME] = "Sold from selection (store level)"
     default_owners = {
         **DEFAULT_OWNERS,
         SOLD_FROM_SELECTION_PROMOTED_NAME: {"leader": "CAT & Content", "partner": ""},
@@ -222,10 +255,10 @@ def _build_payload(actuals_snow: dict[str, list[float | None]]) -> dict:
         "approvedLookerExplores": APPROVED_LOOKER_EXPLORES,
         "notCertifiedLookerExplores": LOOKER_EXPLORE_NOT_CERTIFIED,
         "reviewMetrics": list(REVIEW_TAB_METRICS),
-        "reviewNote": SESSION_REVIEW_NOTE,
-        "maintenanceReviewNote": MAINTENANCE_REVIEW_NOTE,
-        "maintenanceReview": MAINTENANCE_REVIEW_PAYLOAD,
-        "soldSelectionReviewNote": SOLD_FROM_SELECTION_NOTE,
+        "reviewNote": DASHBOARD_SESSION_REVIEW_NOTE,
+        "maintenanceReviewNote": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
+        "maintenanceReview": DASHBOARD_MAINTENANCE_REVIEW,
+        "soldSelectionReviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
         "lookerRef": {
             k: LOOKER[k]
             for k in REVIEW_TAB_METRICS
@@ -238,16 +271,13 @@ def _build_payload(actuals_snow: dict[str, list[float | None]]) -> dict:
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
-        "scApproval": {k: SC_APPROVAL[k] for k in ALL_METRIC_NAMES if k in SC_APPROVAL},
         "userVerified": sorted(USER_VERIFIED),
-        "essiSession": ESSI_SESSION_PAYLOAD,
-        "essiSessionNote": ESSI_SESSION_PAYLOAD["noteHe"],
+        "essiSession": DASHBOARD_ESSI_SESSION,
+        "essiSessionNote": ESSI_SESSION_NOTE,
         "essiSessionSlack": ESSI_SESSION_PAYLOAD["slackUrl"],
-        "aliases": aliases,
         "sources": sources,
         "dataSource": METRIC_DATA_SOURCE,
         "direction": {m: METRIC_DIRECTION.get(m, "higher") for m in ALL_METRIC_NAMES},
-        "hints": METRIC_HINTS,
         "format": format_map,
         "storage": {
             "targets": STORAGE_TARGETS,
@@ -263,54 +293,170 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>OKR 2026 — ISR Wolt Market</title>
+  <title>OKR 2026 — Wolt Market ISR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
   <style>
     :root {
-      --bg: #eef2f7;
+      --wolt-cyan: #00C2E8;
+      --wolt-cyan-dark: #0095B3;
+      --wolt-cyan-deep: #007A94;
+      --wolt-cyan-light: #5DD4EF;
+      --wolt-cyan-pale: #E8FAFE;
+      --wolt-cyan-muted: #C2EEF8;
+      --bg: #edf8fb;
       --surface: #ffffff;
-      --surface2: #f8fafc;
-      --border: #cbd5e1;
-      --text: #0f172a;
-      --muted: #64748b;
-      --accent: #2563eb;
-      --accent-dim: #1d4ed8;
-      --miss-bg: #fecaca;
-      --miss-border: #ef4444;
-      --miss-text: #7f1d1d;
-      --hit-bg: #bbf7d0;
-      --hit-border: #22c55e;
-      --hit-text: #14532d;
-      --neutral-bg: #f1f5f9;
-      --tab-active: #2563eb;
-      --radius: 12px;
+      --surface2: #f6fdff;
+      --border: #b8e4ef;
+      --text: #0a2540;
+      --muted: #5a7d8c;
+      --accent: var(--wolt-cyan);
+      --accent-dim: var(--wolt-cyan-dark);
+      --miss-bg: #ffe4e6;
+      --miss-border: #fb7185;
+      --miss-text: #9f1239;
+      --hit-bg: #d1fae5;
+      --hit-border: #34d399;
+      --hit-text: #065f46;
+      --neutral-bg: #f0f9fc;
+      --tab-active: var(--wolt-cyan);
+      --radius: 24px;
+      --radius-sm: 16px;
+      --radius-pill: 999px;
+      --font-ui: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+      --font-body: "Outfit", "Segoe UI", system-ui, sans-serif;
+      --shadow-sm: 0 2px 12px rgba(0, 149, 179, 0.1);
+      --shadow-md: 0 16px 40px rgba(0, 149, 179, 0.14);
+      --shadow-lg: 0 24px 56px rgba(0, 122, 148, 0.16);
+      --table-head-bg: linear-gradient(180deg, #e8fafe 0%, #d4f4fc 100%);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      background: linear-gradient(165deg, #eef2f7 0%, #f8fafc 50%, #e2e8f0 100%);
+      font-family: var(--font-body);
+      background:
+        radial-gradient(ellipse 90% 55% at 8% -12%, rgba(0, 194, 232, 0.22), transparent 58%),
+        radial-gradient(ellipse 70% 45% at 98% 0%, rgba(93, 212, 239, 0.16), transparent 52%),
+        linear-gradient(180deg, #edf8fb 0%, #f8fdfe 48%, #e5f4f8 100%);
       color: var(--text);
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
-    .wrap { max-width: 1480px; margin: 0 auto; padding: 24px 20px 48px; }
-    header { margin-bottom: 20px; }
-    h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
-    .subtitle { color: var(--muted); font-size: 14px; margin: 0; }
+    .wrap { max-width: 1480px; margin: 0 auto; padding: 28px 22px 52px; }
+    .brand-header {
+      background: linear-gradient(128deg, rgba(0, 194, 232, 0.95) 0%, rgba(0, 152, 189, 0.92) 55%, rgba(0, 122, 148, 0.88) 100%);
+      border-radius: 32px;
+      padding: 24px 28px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      backdrop-filter: blur(12px);
+    }
+    .brand-header::before {
+      content: "";
+      position: absolute;
+      top: -40%;
+      right: -8%;
+      width: 280px;
+      height: 280px;
+      background: radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .brand-header::after {
+      content: "";
+      position: absolute;
+      bottom: -50%;
+      left: 5%;
+      width: 200px;
+      height: 200px;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .brand-top {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      flex-wrap: wrap;
+      position: relative;
+      z-index: 1;
+    }
+    .wm-logo {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 22px;
+      overflow: hidden;
+      box-shadow: 0 10px 32px rgba(0, 60, 80, 0.28);
+      line-height: 0;
+    }
+    .wm-logo-img {
+      display: block;
+      height: 54px;
+      width: auto;
+      object-fit: contain;
+    }
+    .brand-text { flex: 1; min-width: 200px; }
+    .brand-text h1 {
+      margin: 0 0 4px;
+      font-family: var(--font-ui);
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      color: #fff;
+      line-height: 1.1;
+    }
+    .brand-text .subtitle {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
+      margin: 0;
+      font-weight: 500;
+    }
+    .brand-badge {
+      margin-left: auto;
+      background: rgba(255, 255, 255, 0.16);
+      backdrop-filter: blur(10px);
+      padding: 10px 18px;
+      border-radius: var(--radius-pill);
+      font-family: var(--font-ui);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.32);
+    }
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px;
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(184, 228, 239, 0.85);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-sm);
     }
-    .toolbar-block label { display: block; font-size: 11px; text-transform: uppercase;
-      letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+    .toolbar-block label {
+      display: block; font-family: var(--font-ui); font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted); margin-bottom: 8px; font-weight: 600;
+    }
     .period-chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip {
       border: 1px solid var(--border); background: var(--surface2); color: var(--text);
-      border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer;
-      transition: all 0.15s ease;
+      border-radius: var(--radius-pill); padding: 8px 16px; font-size: 13px; cursor: pointer;
+      font-family: var(--font-ui); font-weight: 600;
+      transition: all 0.2s ease;
     }
-    .chip:hover { border-color: var(--accent); }
-    .chip.active { background: var(--tab-active); border-color: #1d4ed8; color: #fff; }
+    .chip:hover { border-color: var(--wolt-cyan); background: var(--wolt-cyan-pale); }
+    .chip.active {
+      background: linear-gradient(135deg, var(--wolt-cyan) 0%, var(--wolt-cyan-dark) 100%);
+      border-color: var(--wolt-cyan-dark);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(0, 149, 179, 0.35);
+    }
     .chip:disabled, .chip.disabled { opacity: 0.45; cursor: not-allowed; }
     .leader-toolbar {
       padding: 14px 18px; border-bottom: 1px solid var(--border);
@@ -334,39 +480,64 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .wf-auto { background: #d1fae5; color: #065f46; }
     tr.row-cancelled td { opacity: 0.55; }
     tr.leader-section td.leader-col {
-      background: #e2e8f0; font-weight: 700; color: #334155;
-      border-top: 2px solid #94a3b8;
+      background: var(--wolt-cyan-pale); font-weight: 700; color: var(--wolt-cyan-deep);
+      border-top: 2px solid var(--wolt-cyan-light);
     }
     .btn {
-      border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px;
-      font-weight: 600; cursor: pointer; background: var(--surface2);
+      border: none; border-radius: var(--radius-pill); padding: 9px 18px; font-size: 13px;
+      font-family: var(--font-ui); font-weight: 600; cursor: pointer; background: var(--surface2);
       color: var(--text); border: 1px solid var(--border);
+      transition: all 0.2s ease;
     }
-    .btn:hover { border-color: var(--accent); }
-    .btn-primary { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+    .btn:hover { border-color: var(--wolt-cyan); color: var(--wolt-cyan-dark); }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--wolt-cyan) 0%, var(--wolt-cyan-dark) 100%);
+      border-color: var(--wolt-cyan-dark);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(0, 149, 179, 0.3);
+    }
     .btn-muted { opacity: 0.8; }
     .action-col { min-width: 170px; vertical-align: middle; }
-    tr.row-selected td { background: rgba(37, 99, 235, 0.08); }
-    tr.row-selected .metric-cell { box-shadow: inset 3px 0 0 var(--accent); }
-    .tabs { display: flex; gap: 8px; margin-bottom: 0; }
-    .tab {
-      padding: 12px 20px; border: 1px solid var(--border); border-bottom: none;
-      border-radius: var(--radius) var(--radius) 0 0; background: var(--surface2);
-      color: var(--muted); cursor: pointer; font-weight: 600; font-size: 14px;
+    tr.row-selected td { background: rgba(0, 194, 232, 0.08); }
+    tr.row-selected .metric-cell { box-shadow: inset 3px 0 0 var(--wolt-cyan); }
+    .tab-shell { margin-bottom: 0; }
+    .tabs {
+      display: inline-flex; gap: 4px; margin-bottom: 0; padding: 6px;
+      background: rgba(255, 255, 255, 0.78);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(184, 228, 239, 0.9);
+      border-radius: var(--radius-pill);
+      box-shadow: var(--shadow-sm);
     }
-    .tab.active { background: var(--surface); color: var(--text); border-color: var(--border);
-      box-shadow: inset 0 2px 0 var(--accent); }
+    .tab {
+      padding: 11px 22px; border: none;
+      border-radius: var(--radius-pill); background: transparent;
+      color: var(--muted); cursor: pointer; font-family: var(--font-ui);
+      font-weight: 600; font-size: 14px;
+      transition: all 0.22s ease;
+    }
+    .tab:hover { color: var(--wolt-cyan-dark); background: rgba(232, 250, 254, 0.85); }
+    .tab.active {
+      background: linear-gradient(135deg, var(--wolt-cyan) 0%, var(--wolt-cyan-dark) 100%);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(0, 149, 179, 0.38);
+    }
     .panel {
-      background: var(--surface); border: 1px solid var(--border);
-      border-radius: 0 var(--radius) var(--radius) var(--radius);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(184, 228, 239, 0.85);
+      border-radius: var(--radius);
       padding: 0; overflow: hidden;
+      box-shadow: var(--shadow-md);
+      margin-top: 16px;
     }
     .panel.hidden { display: none; }
     .panel-head {
       padding: 14px 18px; border-bottom: 1px solid var(--border);
       display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+      background: linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
     }
-    .panel-head h2 { margin: 0; font-size: 16px; }
+    .panel-head h2 { margin: 0; font-size: 16px; color: var(--wolt-cyan-deep); font-weight: 700; font-family: var(--font-ui); }
     .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
     .legend span { display: inline-flex; align-items: center; gap: 6px; }
     .swatch-miss { width: 14px; height: 14px; border-radius: 3px; background: var(--miss-bg); border: 1px solid var(--miss-border); }
@@ -384,37 +555,72 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .table-scroll { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 200px); }
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 1100px; }
     th, td { border-bottom: 1px solid var(--border); padding: 12px 10px; text-align: center; vertical-align: top; }
-    th { position: sticky; top: 0; background: #e2e8f0; z-index: 2; color: #475569;
-      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    th { position: sticky; top: 0;
+      background: var(--table-head-bg);
+      z-index: 2; color: var(--wolt-cyan-deep);
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700;
+      border-bottom: 2px solid var(--wolt-cyan-muted);
+    }
+    th.leader-col, th.partner-col, th.corner, th.month-col, th.action-col {
+      background: var(--table-head-bg);
+    }
+    th.leader-col, th.partner-col, th.corner {
+      font-size: 13px; font-weight: 700; font-family: var(--font-ui);
+      letter-spacing: 0.08em; vertical-align: middle; padding: 14px 10px;
+      text-align: center;
+    }
+    th.month-col {
+      font-size: 14px; font-weight: 700; font-family: var(--font-ui);
+      letter-spacing: 0.05em; vertical-align: middle; padding: 14px 10px;
+      min-width: 108px;
+    }
+    th.month-col .th-sub, .edit-sub {
+      display: block; font-size: 12px; font-weight: 600; text-transform: none;
+      letter-spacing: 0.02em; margin-top: 4px; color: var(--muted);
+      font-family: var(--font-body);
+    }
     th.corner, td.metric-cell {
-      text-align: left; position: sticky; left: 196px; background: var(--surface); z-index: 1;
+      text-align: center; position: sticky; left: 208px; z-index: 1;
       min-width: 280px; max-width: 360px; width: 280px; line-height: 1.45; white-space: normal;
+      vertical-align: middle;
     }
-    th.corner { z-index: 3; left: 196px; }
+    td.metric-cell { background: var(--surface); }
+    th.corner { z-index: 3; left: 208px; background: var(--table-head-bg); }
     th.leader-col, td.leader-col {
-      text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 2;
-      min-width: 84px; width: 84px; font-size: 12px; vertical-align: top;
+      text-align: center; position: sticky; left: 0; z-index: 2;
+      min-width: 96px; width: 96px; font-size: 15px; font-weight: 700;
+      font-family: var(--font-ui); vertical-align: middle; color: var(--wolt-cyan-deep);
+      letter-spacing: -0.01em; line-height: 1.25;
     }
+    td.leader-col { background: var(--surface); }
+    th.leader-col { background: var(--table-head-bg); }
     th.partner-col, td.partner-col {
-      text-align: left; position: sticky; left: 84px; background: var(--surface); z-index: 2;
-      min-width: 112px; width: 112px; font-size: 12px; vertical-align: top;
+      text-align: center; position: sticky; left: 96px; z-index: 2;
+      min-width: 112px; width: 112px; font-size: 15px; font-weight: 700;
+      font-family: var(--font-ui); vertical-align: middle; color: var(--wolt-cyan-deep);
+      letter-spacing: -0.01em; line-height: 1.25;
     }
+    td.partner-col { background: var(--surface); }
+    th.partner-col { background: var(--table-head-bg); }
     th.leader-col { z-index: 4; left: 0; }
-    th.partner-col { z-index: 4; left: 72px; }
+    th.partner-col { z-index: 4; left: 96px; }
     .meta-input {
-      width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
       color: var(--text); padding: 6px 8px; font-size: 12px;
     }
-    .meta-input:focus { outline: none; border-color: var(--accent); }
+    .meta-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 3px rgba(0, 194, 232, 0.2); }
     .target-val { font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
-    .edit-sub { font-size: 11px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
+    .edit-sub { font-size: 12px; color: var(--muted); font-weight: 600; display: block; margin-top: 4px; }
     .manual-row td { background: rgba(237, 233, 254, 0.35); }
-    .metric-name { font-weight: 600; color: var(--text); }
+    .metric-name {
+      font-weight: 700; color: var(--text); font-family: var(--font-ui);
+      font-size: 15px; letter-spacing: -0.01em; line-height: 1.25;
+    }
     .metric-alias { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
     .metric-hint { font-size: 10px; color: #64748b; margin-top: 2px; }
     .src-link {
-      display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
-      font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 500;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px; margin-top: 6px;
+      font-size: 11px; color: var(--wolt-cyan-dark); text-decoration: none; font-weight: 600;
     }
     .src-link:hover { text-decoration: underline; }
     .src-link svg { width: 12px; height: 12px; opacity: 0.85; }
@@ -422,7 +628,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 96px;
     }
     .cell-actual {
-      border-radius: 8px; padding: 10px 8px; min-width: 96px; min-height: 52px;
+      border-radius: var(--radius-sm); padding: 10px 8px; min-width: 96px; min-height: 52px;
       background: var(--neutral-bg); border: 1px solid var(--border);
       box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;
     }
@@ -434,24 +640,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       background: var(--hit-bg) !important; border: 2px solid var(--hit-border) !important; color: var(--hit-text);
     }
     .cell-actual.no-target { border-style: dashed; opacity: 0.92; }
-    .actual-val { font-size: 17px; font-weight: 700; line-height: 1.2; }
+    .actual-val { font-size: 17px; font-weight: 700; line-height: 1.2; font-family: var(--font-ui); letter-spacing: -0.02em; }
     .cell-target-mini {
-      padding: 6px 8px; border-radius: 8px; text-align: center;
-      background: #fffbeb; border: 1.5px solid #f59e0b;
-      font-size: 11px; font-weight: 700; color: #92400e; line-height: 1.3;
-      box-shadow: 0 1px 2px rgba(146, 64, 14, 0.08);
+      padding: 6px 10px; border-radius: var(--radius-sm); text-align: center;
+      background: var(--wolt-cyan-pale); border: 1.5px solid var(--wolt-cyan-light);
+      font-size: 11px; font-weight: 700; color: var(--wolt-cyan-deep); line-height: 1.3;
+      box-shadow: 0 2px 8px rgba(0, 149, 179, 0.1);
     }
     .cell-target-mini .lbl {
       display: block; font-size: 9px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: 0.04em; color: #b45309; margin-bottom: 2px;
+      letter-spacing: 0.04em; color: var(--wolt-cyan-dark); margin-bottom: 2px;
     }
     .actual-inline-input {
       width: 100%; min-width: 72px; max-width: 110px;
-      background: #fff; border: 1px solid var(--border); border-radius: 6px;
+      background: #fff; border: 1px solid var(--border); border-radius: 12px;
       color: var(--text); padding: 8px 10px; font-size: 15px; font-weight: 700;
       text-align: center; font-variant-numeric: tabular-nums;
     }
-    .actual-inline-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+    .actual-inline-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 3px rgba(0,194,232,0.2); }
     .target-only-cell { display: flex; align-items: center; justify-content: center; min-height: 52px; }
     .edit-cell-stack { display: flex; flex-direction: column; gap: 8px; align-items: center; min-height: 52px; justify-content: center; }
     .cell-actual.miss .target-val { color: #fca5a5; }
@@ -459,29 +665,31 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .no-actual { color: #64748b; font-style: italic; }
     .target-input {
       width: 100%; min-width: 72px; max-width: 110px;
-      background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;
       color: var(--text); padding: 8px 10px; font-size: 14px; text-align: center;
       font-variant-numeric: tabular-nums;
     }
-    .target-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+    .target-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 3px rgba(0,194,232,0.2); }
     .target-wrap { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; }
     .target-wrap.percent .target-input { max-width: 88px; }
     .target-suffix { color: var(--muted); font-size: 13px; font-weight: 600; }
     .save-toast {
-      position: fixed; bottom: 20px; right: 20px; background: #ffffff;
-      border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px;
-      font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99;
-      box-shadow: 0 4px 12px rgba(15,23,42,0.12);
+      position: fixed; bottom: 24px; right: 24px;
+      background: linear-gradient(135deg, var(--wolt-cyan) 0%, var(--wolt-cyan-dark) 100%);
+      border: none; padding: 12px 20px; border-radius: var(--radius-pill);
+      font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: #fff;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99;
+      box-shadow: var(--shadow-md);
     }
     .save-toast.show { opacity: 1; }
     .summary-bar {
       display: flex; gap: 20px; flex-wrap: wrap; padding: 12px 18px;
       background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 13px;
     }
-    .summary-bar strong { color: var(--accent); }
+    .summary-bar strong { color: var(--wolt-cyan-dark); }
     .hint-banner {
-      margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; font-size: 13px;
-      background: #eff6ff; border: 1px solid #93c5fd; color: #1e3a8a;
+      margin: 0 0 16px; padding: 14px 18px; border-radius: var(--radius-sm); font-size: 13px;
+      background: var(--wolt-cyan-pale); border: 1px solid var(--wolt-cyan-muted); color: var(--wolt-cyan-deep);
     }
     .hint-banner.warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
     .essi-card {
@@ -498,16 +706,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .essi-sources { width: 100%; font-size: 12px; margin-top: 10px; border-collapse: collapse; }
     .essi-sources th, .essi-sources td { border: 1px solid #166534; padding: 8px 10px; text-align: left; }
     .essi-sources th { background: #dcfce7; color: #166534; }
-    .essi-card a { color: #2563eb; }
+    .essi-card a { color: var(--wolt-cyan-dark); }
     .essi-meta { font-size: 12px; color: #166534; margin: 8px 0 0; line-height: 1.5; }
     footer { margin-top: 20px; font-size: 12px; color: var(--muted); line-height: 1.6; }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>OKR 2026 — ISR Wolt Market 1P</h1>
-      <p class="subtitle">Main KPIs (blue) · KPI by Leader · Jan–Dec 2026 · saved in your browser</p>
+    <header class="brand-header">
+      <div class="brand-top">
+        <div class="wm-logo">
+          <img class="wm-logo-img" src="__LOGO_DATA_URI__" alt="Wolt Market"/>
+        </div>
+        <div class="brand-text">
+          <h1>OKR 2026</h1>
+          <p class="subtitle">ISR · 1P Local · Main KPIs · Jan–Dec 2026</p>
+        </div>
+        <div class="brand-badge">Wolt Market ISR</div>
+      </div>
     </header>
 
     <div class="toolbar">
@@ -526,11 +742,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     <div id="hintBanner" class="hint-banner warn"></div>
 
-    <div class="tabs">
-      <button type="button" class="tab active" data-tab="performance">Main KPIs</button>
-      <button type="button" class="tab" data-tab="leader">KPI by Leader</button>
-      <button type="button" class="tab" data-tab="edit">Target</button>
-      <button type="button" class="tab" data-tab="review">לבדיקה</button>
+    <div class="tab-shell">
+      <div class="tabs">
+        <button type="button" class="tab active" data-tab="performance">Main KPIs</button>
+        <button type="button" class="tab" data-tab="leader">KPI by Leader</button>
+        <button type="button" class="tab" data-tab="edit">Target</button>
+        <button type="button" class="tab" data-tab="review">For review</button>
+      </div>
     </div>
 
     <div class="panel" id="panelPerformance">
@@ -579,8 +797,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     <div class="panel hidden" id="panelEdit">
       <div class="panel-head">
-        <h2>Target — יעדים בלבד</h2>
-        <span style="font-size:12px;color:var(--muted);">הזן יעד לכל חודש · נשמר אוטומטית</span>
+        <h2>Target — goals only</h2>
+        <span style="font-size:12px;color:var(--muted);">Enter a target per month · auto-saved</span>
       </div>
       <div class="table-scroll">
         <table id="editTable">
@@ -592,8 +810,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     <div class="panel hidden" id="panelReview">
       <div class="panel-head">
-        <h2>לבדיקה</h2>
-        <span style="font-size:12px;color:var(--muted);">Sold from selection — בחר וריאנט</span>
+        <h2>For review</h2>
+        <span style="font-size:12px;color:var(--muted);">Sold from selection — pick a variant</span>
       </div>
       <div class="hint-banner warn" id="reviewBanner"></div>
       <div class="table-scroll">
@@ -724,7 +942,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       updateHintBanner();
       const toast = document.getElementById("saveToast");
       const label = CFG.soldSelectionVariants[key]?.lookerField || key;
-      toast.textContent = `נבחר: ${label} — מוצג ב-Main KPIs וב-KPI by Leader`;
+      toast.textContent = `Selected: ${label} — shown in Main KPIs and KPI by Leader`;
       toast.classList.add("show");
       clearTimeout(saveTimer);
       saveTimer = setTimeout(() => toast.classList.remove("show"), 2800);
@@ -845,9 +1063,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const wf = (CFG.metricWorkflow || {})[metric] || "auto";
       const map = {
         manual: ["Manual", "wf-manual"],
-        pending_send: ["אשלח אליך", "wf-pending_send"],
+        pending_send: ["Pending send", "wf-pending_send"],
         cancelled: ["Cancelled", "wf-cancelled"],
-        pending_impl: ["בהמשך", "wf-pending_impl"],
+        pending_impl: ["Later", "wf-pending_impl"],
         yearly: ["Yearly", "wf-yearly"],
         auto: ["", ""],
       };
@@ -967,7 +1185,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const n = countTargets();
       if (n === 0) {
         el.className = "hint-banner warn";
-        el.innerHTML = "<strong>אין יעדים.</strong> לך ל-<strong>Target</strong> להזין יעדים — או לטעון מחדש אם מחקת overrides.";
+        el.innerHTML = "<strong>No targets.</strong> Go to <strong>Target</strong> to enter targets — or reload if you cleared overrides.";
       } else {
         el.className = "hint-banner";
         let soldNote = "";
@@ -975,9 +1193,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           soldNote = ` · <strong>Sold from selection</strong>: ${escHtml(CFG.soldSelectionVariants[soldSelectionChoice].lookerField)}`;
         }
         const srcNote = (CFG.defaultTargets && Object.keys(CFG.defaultTargets).length)
-          ? " · יעדים מגיליון OKR (ניתן לעריכה ב-Target)"
+          ? " · Targets from OKR spreadsheet (editable in Target)"
           : "";
-        el.innerHTML = `<strong>${n} target(s).</strong> ירוק = עמד ביעד · אדום = פספס · יעד מתחת לביצוע.${srcNote}${soldNote}`;
+        el.innerHTML = `<strong>${n} target(s).</strong> Green = on target · Red = missed · target shown below actual.${srcNote}${soldNote}`;
       }
     }
 
@@ -1113,8 +1331,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         user_provided: ["User", "src-user"],
         manual_entry: ["Manual", "src-manual"],
         pending_review: ["Review", "src-review"],
-        for_review: ["לבדיקה", "src-review"],
-        looker_not_approved: ["לבדיקה", "src-review"],
+        for_review: ["For review", "src-review"],
+        looker_not_approved: ["For review", "src-review"],
       };
       const [label, cls] = map[kind] || ["Manual", "src-manual"];
       return `<span class="src-badge ${cls}">${label}</span>`;
@@ -1171,18 +1389,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const paras = (e.quote || "").split("\n\n").map(p => `<p>${escHtml(p)}</p>`).join("");
       el.innerHTML = `<h3>${escHtml(e.meta || "Essi")}</h3>`
         + `<blockquote class="essi-quote">${paras}</blockquote>`
-        + `<p class="essi-meta"><a href="${escAttr(e.slackUrl)}" target="_blank" rel="noopener">פתיחת ההודעה ב-Slack</a>`
-        + ` · thread על NV session conversion</p>`
-        + `<table class="essi-sources"><thead><tr><th>מקור Looker</th><th>סטטוס</th><th>קישור</th></tr></thead><tbody>`
+        + `<p class="essi-meta"><a href="${escAttr(e.slackUrl)}" target="_blank" rel="noopener">Open Slack message</a>`
+        + ` · thread on NV session conversion</p>`
+        + `<table class="essi-sources"><thead><tr><th>Looker source</th><th>Status</th><th>Link</th></tr></thead><tbody>`
         + `<tr><td><code>wolt_market_data/wolt_market_venue_conversion</code></td>`
-        + `<td>Essi ✅ — סשנים + CVR</td>`
+        + `<td>Essi ✅ — sessions + CVR</td>`
         + `<td><a href="${escAttr(e.venueConversionUrl)}" target="_blank" rel="noopener">Venue Conversion</a></td></tr>`
         + `<tr><td><code>kpi_data/wolt_market_metrics</code></td>`
         + `<td>deprecated</td>`
-        + `<td><a href="${escAttr(e.kpiDeprecatedUrl)}" target="_blank" rel="noopener">WM Metrics (ישן)</a></td></tr>`
+        + `<td><a href="${escAttr(e.kpiDeprecatedUrl)}" target="_blank" rel="noopener">WM Metrics (legacy)</a></td></tr>`
         + `</tbody></table>`
-        + `<p class="essi-meta"><strong>למה בלבדיקה?</strong> ${escHtml(e.svenjaNote || "")}</p>`
-        + `<p class="essi-meta">${escHtml(e.noteHe || "")}</p>`;
+        + `<p class="essi-meta"><strong>Why in For review?</strong> ${escHtml(e.svenjaNote || "")}</p>`
+        + `<p class="essi-meta">${escHtml(e.noteHe || e.note || "")}</p>`;
     }
 
     function renderMaintenanceCard() {
@@ -1205,9 +1423,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       el.innerHTML = `<h3 style="color:#92400e;">${escHtml(m.title || "Maintenance costs")}</h3>`
         + `<p class="essi-meta">${escHtml(CFG.maintenanceReviewNote || m.noteHe || "")}</p>`
         + `<p class="essi-meta"><strong>NetSuite:</strong> <code>${escHtml(m.netsuiteAccount || "87310")}</code> · `
-        + `<strong>מאי 2026:</strong> NetSuite ${m.may2026Netsuite} kILS vs IBM ${m.may2026Ibm} kILS · `
-        + `פער ≈ ${m.may2026Gap} kILS</p>`
-        + `<table class="essi-sources"><thead><tr><th>חודש</th><th>NetSuite 87310</th><th>IBM fallback</th><th>Gap</th></tr></thead><tbody>${rows}</tbody></table>`;
+        + `<strong>May 2026:</strong> NetSuite ${m.may2026Netsuite} kILS vs IBM ${m.may2026Ibm} kILS · `
+        + `gap ≈ ${m.may2026Gap} kILS</p>`
+        + `<table class="essi-sources"><thead><tr><th>Month</th><th>NetSuite 87310</th><th>IBM fallback</th><th>Gap</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderReview() {
@@ -1216,7 +1434,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         banner.innerHTML = (CFG.soldSelectionReviewNote
             ? `<strong>Sold from selection:</strong> ${CFG.soldSelectionReviewNote} `
             : "")
-          + " <strong>Looker Purchases:</strong> רק wolt_market_exploration (V ✅) — לא wolt_market_data.";
+          + " <strong>Looker Purchases:</strong> wolt_market_exploration (V ✅) only — not wolt_market_data.";
       }
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
       const thead = document.querySelector("#reviewTable thead");
@@ -1225,7 +1443,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + months.map(k => {
           const i = monthIndex(k);
-          return `<th>${CFG.monthLabels[i]}<br><span style="font-weight:400;text-transform:none">Snowflake / Looker ref</span></th>`;
+          return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Snowflake / Looker ref</span></th>`;
         }).join("") + "<th class='action-col'>Action</th></tr>";
       const metrics = CFG.reviewMetrics || [];
       tbody.innerHTML = metrics.map(metric => {
@@ -1254,10 +1472,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         let action = "";
         if (variantKey) {
           if (isChosen) {
-            action = `<button type="button" class="btn btn-muted" data-sold-clear="1">בטל בחירה</button>`
+            action = `<button type="button" class="btn btn-muted" data-sold-clear="1">Clear selection</button>`
               + `<div class="metric-hint" style="color:#4ade80;margin-top:8px">✓ Main KPIs + KPI by Leader</div>`;
           } else {
-            action = `<button type="button" class="btn btn-primary" data-sold-choice="${escAttr(variantKey)}">השתמש בדשבורד</button>`;
+            action = `<button type="button" class="btn btn-primary" data-sold-choice="${escAttr(variantKey)}">Use in dashboard</button>`;
           }
         }
         const rowCls = isChosen ? " class='row-selected'" : "";
@@ -1338,7 +1556,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
           let targetHtml = "";
           if (target !== null) {
-            targetHtml = `<div class="cell-target-mini"><span class="lbl">יעד</span>${formatTargetValue(metric, target)}</div>`;
+            targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
           }
 
           let delta = "";
@@ -1346,7 +1564,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             const d = actual - target;
             let deltaTxt = formatDisplay(metric, d, false);
             if (d > 0) deltaTxt = "+" + deltaTxt;
-            delta = `<div class="delta">${deltaTxt} vs יעד</div>`;
+            delta = `<div class="delta">${deltaTxt} vs target</div>`;
           }
 
           return `<td><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}${delta}</div>${targetHtml}</div></td>`;
@@ -1365,7 +1583,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + months.map(k => {
           const i = monthIndex(k);
-          return `<th>${CFG.monthLabels[i]}<br><span style="font-weight:400;text-transform:none">ביצוע</span></th>`;
+          return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Actual</span></th>`;
         }).join("") + "</tr>";
     }
 
@@ -1461,7 +1679,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + months.map(k => {
           const lbl = CFG.monthLabels[monthIndex(k)];
-          return `<th>${lbl}<span class="edit-sub">יעד</span></th>`;
+          return `<th class="month-col">${lbl}<span class="edit-sub">Target</span></th>`;
         }).join("") + "</tr>";
 
       tbody.innerHTML = editMetricsList.map((metric, mIdx) => {
@@ -1536,8 +1754,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 """
 
 
+def _logo_data_uri() -> str:
+    if not LOGO_PATH.is_file():
+        return ""
+    encoded = base64.b64encode(LOGO_PATH.read_bytes()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
 def build_html(payload: dict) -> str:
-    return HTML_TEMPLATE.replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False))
+    html = HTML_TEMPLATE.replace("__PAYLOAD__", json.dumps(payload, ensure_ascii=False))
+    return html.replace("__LOGO_DATA_URI__", _logo_data_uri())
 
 
 def main() -> None:
