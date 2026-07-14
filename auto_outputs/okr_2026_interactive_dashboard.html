@@ -1,0 +1,1275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>OKR 2026 — ISR Wolt Market</title>
+  <style>
+    :root {
+      --bg: #eef2f7;
+      --surface: #ffffff;
+      --surface2: #f8fafc;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --muted: #64748b;
+      --accent: #2563eb;
+      --accent-dim: #1d4ed8;
+      --miss-bg: #fecaca;
+      --miss-border: #ef4444;
+      --miss-text: #7f1d1d;
+      --hit-bg: #bbf7d0;
+      --hit-border: #22c55e;
+      --hit-text: #14532d;
+      --neutral-bg: #f1f5f9;
+      --tab-active: #2563eb;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: linear-gradient(165deg, #eef2f7 0%, #f8fafc 50%, #e2e8f0 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1480px; margin: 0 auto; padding: 24px 20px 48px; }
+    header { margin-bottom: 20px; }
+    h1 { margin: 0 0 6px; font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+    .subtitle { color: var(--muted); font-size: 14px; margin: 0; }
+    .toolbar {
+      display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 18px; margin-bottom: 16px;
+    }
+    .toolbar-block label { display: block; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; font-weight: 600; }
+    .period-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      border: 1px solid var(--border); background: var(--surface2); color: var(--text);
+      border-radius: 999px; padding: 7px 14px; font-size: 13px; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .chip:hover { border-color: var(--accent); }
+    .chip.active { background: var(--tab-active); border-color: #1d4ed8; color: #fff; }
+    .chip:disabled, .chip.disabled { opacity: 0.45; cursor: not-allowed; }
+    .leader-toolbar {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      background: var(--surface2); display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+    }
+    .leader-toolbar label {
+      display: block; font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; font-weight: 600;
+    }
+    .leader-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .wf-badge {
+      display: inline-block; margin-top: 6px; margin-right: 6px;
+      font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+      letter-spacing: 0.02em;
+    }
+    .wf-manual { background: #ede9fe; color: #5b21b6; }
+    .wf-pending_send { background: #fef3c7; color: #92400e; }
+    .wf-cancelled { background: #e2e8f0; color: #475569; text-decoration: line-through; }
+    .wf-pending_impl { background: #dbeafe; color: #1e40af; }
+    .wf-yearly { background: #fce7f3; color: #9d174d; }
+    .wf-auto { background: #d1fae5; color: #065f46; }
+    tr.row-cancelled td { opacity: 0.55; }
+    tr.leader-section td.leader-col {
+      background: #e2e8f0; font-weight: 700; color: #334155;
+      border-top: 2px solid #94a3b8;
+    }
+    .btn {
+      border: none; border-radius: 8px; padding: 8px 14px; font-size: 13px;
+      font-weight: 600; cursor: pointer; background: var(--surface2);
+      color: var(--text); border: 1px solid var(--border);
+    }
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent-dim); border-color: var(--accent-dim); color: #fff; }
+    .btn-muted { opacity: 0.8; }
+    .action-col { min-width: 170px; vertical-align: middle; }
+    tr.row-selected td { background: rgba(37, 99, 235, 0.08); }
+    tr.row-selected .metric-cell { box-shadow: inset 3px 0 0 var(--accent); }
+    .tabs { display: flex; gap: 8px; margin-bottom: 0; }
+    .tab {
+      padding: 12px 20px; border: 1px solid var(--border); border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0; background: var(--surface2);
+      color: var(--muted); cursor: pointer; font-weight: 600; font-size: 14px;
+    }
+    .tab.active { background: var(--surface); color: var(--text); border-color: var(--border);
+      box-shadow: inset 0 2px 0 var(--accent); }
+    .panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 0 var(--radius) var(--radius) var(--radius);
+      padding: 0; overflow: hidden;
+    }
+    .panel.hidden { display: none; }
+    .panel-head {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    }
+    .panel-head h2 { margin: 0; font-size: 16px; }
+    .legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .swatch-miss { width: 14px; height: 14px; border-radius: 3px; background: var(--miss-bg); border: 1px solid var(--miss-border); }
+    .swatch-hit { width: 14px; height: 14px; border-radius: 3px; background: var(--hit-bg); border: 1px solid #166534; }
+    .src-badge {
+      display: inline-block; margin-top: 6px; margin-right: 6px;
+      font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    .src-snowflake { background: #d1fae5; color: #065f46; }
+    .src-user { background: #dbeafe; color: #1e40af; }
+    .src-manual { background: #ede9fe; color: #5b21b6; }
+    .src-review { background: #fef3c7; color: #92400e; }
+    .src-blocked { background: #fee2e2; color: #991b1b; }
+    .table-scroll { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 200px); }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; min-width: 1100px; }
+    th, td { border-bottom: 1px solid var(--border); padding: 12px 10px; text-align: center; vertical-align: top; }
+    th { position: sticky; top: 0; background: #e2e8f0; z-index: 2; color: #475569;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    th.corner, td.metric-cell {
+      text-align: left; position: sticky; left: 196px; background: var(--surface); z-index: 1;
+      min-width: 280px; max-width: 360px; width: 280px; line-height: 1.45; white-space: normal;
+    }
+    th.corner { z-index: 3; left: 196px; }
+    th.leader-col, td.leader-col {
+      text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 2;
+      min-width: 84px; width: 84px; font-size: 12px; vertical-align: top;
+    }
+    th.partner-col, td.partner-col {
+      text-align: left; position: sticky; left: 84px; background: var(--surface); z-index: 2;
+      min-width: 112px; width: 112px; font-size: 12px; vertical-align: top;
+    }
+    th.leader-col { z-index: 4; left: 0; }
+    th.partner-col { z-index: 4; left: 72px; }
+    .meta-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 6px 8px; font-size: 12px;
+    }
+    .meta-input:focus { outline: none; border-color: var(--accent); }
+    .target-val { font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+    .edit-sub { font-size: 11px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
+    .manual-row td { background: rgba(237, 233, 254, 0.35); }
+    .metric-name { font-weight: 600; color: var(--text); }
+    .metric-alias { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+    .metric-hint { font-size: 10px; color: #64748b; margin-top: 2px; }
+    .src-link {
+      display: inline-flex; align-items: center; gap: 4px; margin-top: 6px;
+      font-size: 11px; color: var(--accent); text-decoration: none; font-weight: 500;
+    }
+    .src-link:hover { text-decoration: underline; }
+    .src-link svg { width: 12px; height: 12px; opacity: 0.85; }
+    .perf-cell-wrap {
+      display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 96px;
+    }
+    .cell-actual {
+      border-radius: 8px; padding: 10px 8px; min-width: 96px; min-height: 52px;
+      background: var(--neutral-bg); border: 1px solid var(--border);
+      box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    }
+    .cell-actual.has-target { min-height: 56px; }
+    .cell-actual.miss {
+      background: var(--miss-bg) !important; border: 2px solid var(--miss-border) !important; color: var(--miss-text);
+    }
+    .cell-actual.hit {
+      background: var(--hit-bg) !important; border: 2px solid var(--hit-border) !important; color: var(--hit-text);
+    }
+    .cell-actual.no-target { border-style: dashed; opacity: 0.92; }
+    .actual-val { font-size: 17px; font-weight: 700; line-height: 1.2; }
+    .cell-target-mini {
+      padding: 6px 8px; border-radius: 8px; text-align: center;
+      background: #fffbeb; border: 1.5px solid #f59e0b;
+      font-size: 11px; font-weight: 700; color: #92400e; line-height: 1.3;
+      box-shadow: 0 1px 2px rgba(146, 64, 14, 0.08);
+    }
+    .cell-target-mini .lbl {
+      display: block; font-size: 9px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: #b45309; margin-bottom: 2px;
+    }
+    .actual-inline-input {
+      width: 100%; min-width: 72px; max-width: 110px;
+      background: #fff; border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 8px 10px; font-size: 15px; font-weight: 700;
+      text-align: center; font-variant-numeric: tabular-nums;
+    }
+    .actual-inline-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+    .target-only-cell { display: flex; align-items: center; justify-content: center; min-height: 52px; }
+    .edit-cell-stack { display: flex; flex-direction: column; gap: 8px; align-items: center; min-height: 52px; justify-content: center; }
+    .cell-actual.miss .target-val { color: #fca5a5; }
+    .delta { font-size: 10px; margin-top: 2px; opacity: 0.9; }
+    .no-actual { color: #64748b; font-style: italic; }
+    .target-input {
+      width: 100%; min-width: 72px; max-width: 110px;
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 6px;
+      color: var(--text); padding: 8px 10px; font-size: 14px; text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+    .target-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+    .target-wrap { display: inline-flex; align-items: center; justify-content: center; gap: 2px; width: 100%; }
+    .target-wrap.percent .target-input { max-width: 88px; }
+    .target-suffix { color: var(--muted); font-size: 13px; font-weight: 600; }
+    .save-toast {
+      position: fixed; bottom: 20px; right: 20px; background: #ffffff;
+      border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px;
+      font-size: 13px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 99;
+      box-shadow: 0 4px 12px rgba(15,23,42,0.12);
+    }
+    .save-toast.show { opacity: 1; }
+    .summary-bar {
+      display: flex; gap: 20px; flex-wrap: wrap; padding: 12px 18px;
+      background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .summary-bar strong { color: var(--accent); }
+    .hint-banner {
+      margin: 0 0 16px; padding: 12px 16px; border-radius: 10px; font-size: 13px;
+      background: #eff6ff; border: 1px solid #93c5fd; color: #1e3a8a;
+    }
+    .hint-banner.warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+    .essi-card {
+      background: #ecfdf5; border: 1px solid #86efac; border-radius: var(--radius);
+      padding: 16px 18px; margin-bottom: 16px; color: #14532d;
+    }
+    .essi-card h3 { margin: 0 0 10px; font-size: 14px; color: #166534; }
+    .essi-quote {
+      margin: 0 0 12px; padding: 12px 14px; background: #f8fafc; border-left: 4px solid #22c55e;
+      border-radius: 8px; color: #334155; font-size: 13px; line-height: 1.55;
+    }
+    .essi-quote p { margin: 0 0 8px; }
+    .essi-quote p:last-child { margin-bottom: 0; }
+    .essi-sources { width: 100%; font-size: 12px; margin-top: 10px; border-collapse: collapse; }
+    .essi-sources th, .essi-sources td { border: 1px solid #166534; padding: 8px 10px; text-align: left; }
+    .essi-sources th { background: #dcfce7; color: #166534; }
+    .essi-card a { color: #2563eb; }
+    .essi-meta { font-size: 12px; color: #166534; margin: 8px 0 0; line-height: 1.5; }
+    footer { margin-top: 20px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>OKR 2026 — ISR Wolt Market 1P</h1>
+      <p class="subtitle">Main KPIs (blue) · KPI by Leader · Jan–Dec 2026 · saved in your browser</p>
+    </header>
+
+    <div class="toolbar">
+      <div class="toolbar-block">
+        <label>Periods</label>
+        <div class="period-chips" id="periodChips"></div>
+      </div>
+      <div class="toolbar-block">
+        <label>&nbsp;</label>
+        <div style="display:flex;gap:8px;">
+          <button type="button" class="btn" id="btnAllPeriods">All</button>
+          <button type="button" class="btn" id="btnClearPeriods">Latest only</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="hintBanner" class="hint-banner warn"></div>
+
+    <div class="tabs">
+      <button type="button" class="tab active" data-tab="performance">Main KPIs</button>
+      <button type="button" class="tab" data-tab="leader">KPI by Leader</button>
+      <button type="button" class="tab" data-tab="edit">Target</button>
+      <button type="button" class="tab" data-tab="review">לבדיקה</button>
+    </div>
+
+    <div class="panel" id="panelPerformance">
+      <div class="leader-toolbar">
+        <div>
+          <label>Filter by Leader</label>
+          <div class="leader-chips" id="mainLeaderChips"></div>
+        </div>
+      </div>
+      <div class="panel-head">
+        <h2>Main KPIs — Actual vs Target</h2>
+        <div class="legend">
+          <span><i class="swatch-hit"></i> On target</span>
+          <span><i class="swatch-miss"></i> Below target (or above for cost metrics)</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table id="performanceTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelLeader">
+      <div class="leader-toolbar">
+        <div>
+          <label>Filter by Leader</label>
+          <div class="leader-chips" id="leaderChips"></div>
+        </div>
+      </div>
+      <div class="panel-head">
+        <h2>KPI by Leader</h2>
+        <div class="legend">
+          <span><i class="swatch-hit"></i> On target</span>
+          <span><i class="swatch-miss"></i> Missed</span>
+        </div>
+      </div>
+      <div class="table-scroll">
+        <table id="leaderTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelEdit">
+      <div class="panel-head">
+        <h2>Target — יעדים בלבד</h2>
+        <span style="font-size:12px;color:var(--muted);">הזן יעד לכל חודש · נשמר אוטומטית</span>
+      </div>
+      <div class="table-scroll">
+        <table id="editTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panelReview">
+      <div class="panel-head">
+        <h2>לבדיקה</h2>
+        <span style="font-size:12px;color:var(--muted);">Sold from selection — בחר וריאנט</span>
+      </div>
+      <div class="hint-banner warn" id="reviewBanner"></div>
+      <div class="table-scroll">
+        <table id="reviewTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <footer>
+      VSL includes Wolt Market DC (ISR country). Sessions in K. Jun OFL may be partial until UE recon closes.
+      FTU/Returning: presentation.wolt_market_metrics · Looker WM Metrics explore.
+      Essi (21 May 2026): session counts fine to use; double-counting affects users only, not sessions.
+      IDQ pending definition review. Open Looker links per metric to verify source.
+    </footer>
+  </div>
+
+  <div class="save-toast" id="saveToast">Saved</div>
+
+  <script>
+    const CFG = {"mainMetrics": ["Orders", "DDE FEE/order", "Ftu Sessions", "Ftu Conversion", "Returning User Sessions", "Returning User Conversion", "PPM%", "Shrink/DDE FEE", "OFL / order (ILS)", "VP%", "Weighted Availability", "KVI & Promo WA%", "POFR%", "Under 45min >"], "leaderMetrics": ["New Stores", "Expansion", "Relocation", "Maintenance costs", "Utilities costs reduce", "Fulfillment & Drive partner", "3PFL GOV (yearly)", "Robotic store", "Turning B stores to A", "Avg Units per Order", "Order Frequency", "Penetration Rate", "Awareness", "New special vendors or categories", "Area Product Selection", "%Fresh Food / DDE", "IDQ", "VSL", "DC", "Forecast accuracy +/-", "UP-TIME >", "UPH >", "% Bad Goods Rating", "Attrition (monthly) <", "IDP & HQ training", "Internal Mobility", "OPS Training", "Store employees absence <", "Early Attrition (0-3) <", "Engagme >1 (HV)", "Engagme >1 (HQ)", "EngagMe growth"], "leaderOrder": ["OPS", "CAT & Content", "MKT", "General", "SC", "Exp", "Marketing", "HR"], "leaderFilterGroups": {"CAT & Content": ["CAT", "CAT & Content"]}, "metricWorkflow": {"Orders": "auto", "DDE FEE/order": "auto", "Ftu Sessions": "auto", "Ftu Conversion": "auto", "Returning User Sessions": "auto", "Returning User Conversion": "auto", "PPM%": "auto", "Shrink/DDE FEE": "auto", "OFL / order (ILS)": "auto", "VP%": "auto", "Weighted Availability": "auto", "KVI & Promo WA%": "auto", "Sold from selection — sold_from_selection_perc": "auto", "Sold from selection — sold_from_product_selection_perc": "auto", "POFR%": "auto", "Under 45min >": "auto", "New Stores": "manual", "Expansion": "manual", "Relocation": "manual", "Maintenance costs": "pending_send", "Utilities costs reduce": "yearly", "Fulfillment & Drive partner": "manual", "3PFL GOV (yearly)": "manual", "Robotic store": "cancelled", "Turning B stores to A": "manual", "Avg Units per Order": "auto", "Order Frequency": "auto", "Penetration Rate": "auto", "Awareness": "manual", "New special vendors or categories": "manual", "Area Product Selection": "auto", "%Fresh Food / DDE": "manual", "IDQ": "auto", "VSL": "auto", "DC": "pending_send", "Forecast accuracy +/-": "pending_impl", "UP-TIME >": "auto", "UPH >": "pending_impl", "% Bad Goods Rating": "auto", "Attrition (monthly) <": "manual", "IDP & HQ training": "manual", "Internal Mobility": "manual", "OPS Training": "manual", "Store employees absence <": "manual", "Early Attrition (0-3) <": "manual", "Engagme >1 (HV)": "manual", "Engagme >1 (HQ)": "manual", "EngagMe growth": "manual"}, "baseMetrics": ["Orders", "DDE FEE/order", "Ftu Sessions", "Ftu Conversion", "Returning User Sessions", "Returning User Conversion", "PPM%", "Shrink/DDE FEE", "OFL / order (ILS)", "VP%", "Weighted Availability", "KVI & Promo WA%", "POFR%", "Under 45min >", "New Stores", "Expansion", "Relocation", "Maintenance costs", "Utilities costs reduce", "Fulfillment & Drive partner", "3PFL GOV (yearly)", "Robotic store", "Turning B stores to A", "Avg Units per Order", "Order Frequency", "Penetration Rate", "Awareness", "New special vendors or categories", "Area Product Selection", "%Fresh Food / DDE", "IDQ", "VSL", "DC", "Forecast accuracy +/-", "UP-TIME >", "UPH >", "% Bad Goods Rating", "Attrition (monthly) <", "IDP & HQ training", "Internal Mobility", "OPS Training", "Store employees absence <", "Early Attrition (0-3) <", "Engagme >1 (HV)", "Engagme >1 (HQ)", "EngagMe growth"], "metrics": ["Orders", "DDE FEE/order", "Ftu Sessions", "Ftu Conversion", "Returning User Sessions", "Returning User Conversion", "PPM%", "Shrink/DDE FEE", "OFL / order (ILS)", "VP%", "Weighted Availability", "KVI & Promo WA%", "POFR%", "Under 45min >", "New Stores", "Expansion", "Relocation", "Maintenance costs", "Utilities costs reduce", "Fulfillment & Drive partner", "3PFL GOV (yearly)", "Robotic store", "Turning B stores to A", "Avg Units per Order", "Order Frequency", "Penetration Rate", "Awareness", "New special vendors or categories", "Area Product Selection", "%Fresh Food / DDE", "IDQ", "VSL", "DC", "Forecast accuracy +/-", "UP-TIME >", "UPH >", "% Bad Goods Rating", "Attrition (monthly) <", "IDP & HQ training", "Internal Mobility", "OPS Training", "Store employees absence <", "Early Attrition (0-3) <", "Engagme >1 (HV)", "Engagme >1 (HQ)", "EngagMe growth"], "promotedSoldSelectionName": "Sold from selection (store level)", "soldSelectionVariants": {"sold_from_selection_perc": {"metricName": "Sold from selection — sold_from_selection_perc", "lookerLabel": "Purchases (exploration) — Sold from Selection %", "lookerField": "sold_from_selection_perc", "lookerFieldView": "wolt_market_purchases", "lookerExplore": "wolt_market_purchases", "lookerExploreModel": "wolt_market_exploration", "lookerBadge": "V ✅", "snowflakeField": "SOLD_PRODUCTS_FROM_SELECTION_PERC", "alias": "sold_from_selection_perc (exploration Purchases)"}, "sold_from_product_selection_perc": {"metricName": "Sold from selection — sold_from_product_selection_perc", "lookerLabel": "Purchases (exploration) — Sold from Product Selection %", "lookerField": "sold_from_product_selection_perc", "lookerFieldView": "wolt_market_purchases", "lookerExplore": "wolt_market_purchases", "lookerExploreModel": "wolt_market_exploration", "lookerBadge": "V ✅", "snowflakeField": "SOLD_ITEMS_FROM_SELECTION_PERC", "alias": "sold_from_product_selection_perc (exploration Purchases)"}}, "soldSelectionInsertAfter": "KVI & Promo WA%", "soldSelectionInsertAfterLeader": "Area Product Selection", "approvedLookerExplores": [{"key": "golden", "model": "dashboards", "explore": "", "label": "Golden dashboards 106613–106617", "badge": "Golden ✅"}, {"key": "unit_economics", "model": "looks", "explore": "47217", "label": "Wolt Market Unit Economics (Look 47217)", "badge": "UE ✅"}, {"key": "wolt_market_purchases", "model": "wolt_market_exploration", "explore": "wolt_market_purchases", "label": "Wolt Market Purchases (exploration)", "badge": "V ✅"}, {"key": "wolt_market_store_ops_reporting", "model": "wolt_market_dashboards", "explore": "wolt_market_store_ops_reporting", "label": "Wolt Market Store Ops Reporting", "badge": "V ✅"}, {"key": "merchant_app_lite_reporting", "model": "merchant_data", "explore": "merchant_app_lite_reporting", "label": "Merchant App Lite Tasks", "badge": "V ✅"}, {"key": "retail_platform_category_managers_reporting", "model": "merchant_data", "explore": "retail_platform_category_managers_reporting", "label": "Retail Platform - Category Managers Metrics", "badge": "V ✅"}, {"key": "retail_platform_inventory_product_reporting", "model": "merchant_data", "explore": "retail_platform_inventory_product_reporting", "label": "Retail Platform - Product Inventory Metrics", "badge": "V ✅"}], "notCertifiedLookerExplores": [{"model": "wolt_market_data", "explore": "wolt_market_purchases", "label": "Purchases (wolt_market_data)", "badge": "לא מאושר", "note": "Do not use for OKR — use wolt_market_exploration/wolt_market_purchases (V ✅)"}, {"model": "wolt_market_data", "explore": "wolt_market_item_metrics", "label": "Wolt Market Item Metrics", "badge": "! לא מאושר", "note": "Looker warning icon — not certified"}, {"model": "wolt_market_data", "explore": "wolt_market_items", "label": "Wolt Market Items", "badge": "! לא מאושר", "note": "IDQ explore — not on V ✅ list"}, {"model": "wolt_market_data", "explore": "wolt_market_venue_conversion", "label": "WM Venue Conversion (wolt_market_data)", "badge": "Essi ✅", "note": "Essi (21 May): session counts + session-based CVR OK — no FTU/RU split"}, {"model": "kpi_data", "explore": "wolt_market_metrics", "label": "Wolt Market Metrics (kpi_data)", "badge": "deprecated", "note": "Deprecated — Essi Jul 2026; FTU/Returning links still here for Jan–Mar benchmark only"}, {"model": "dashboards", "explore": "96920", "label": "OKR SCM Dashboard 96920", "badge": "לא מאושר", "note": "VSL link — not on user V ✅ explore list"}], "reviewMetrics": ["Sold from selection — sold_from_selection_perc", "Sold from selection — sold_from_product_selection_perc"], "reviewNote": "Essi (21 May 2026): מותר להשתמש בספירת סשנים ובהמרה session-based — double-counting משפיע רק על user/client counts, לא על סשנים. Snowflake: <code>presentation.wolt_market_metrics</code> (country row) · Looker מאושר (Essi): <code>wolt_market_venue_conversion</code> · Looker benchmark (deprecated): <code>kpi_data/wolt_market_metrics</code>.", "maintenanceReviewNote": "IBM Store Maintenance ≠ NetSuite 87310 — Snowflake role לא רואה leaf; ערכי הדשבורד = IBM Pulse fallback. ממתין ל-reconciliation מול Mgmt PL / finance.", "maintenanceReview": {"title": "Maintenance costs — IBM ↔ NetSuite 87310", "noteHe": "IBM Store Maintenance ≠ NetSuite 87310 — Snowflake role לא רואה leaf; ערכי הדשבורד = IBM Pulse fallback. ממתין ל-reconciliation מול Mgmt PL / finance.", "netsuiteAccount": "87310 - Store maintenance - Wolt Markets", "netsuiteKils": [300, 696, 138, 480, 425, null], "ibmKils": [315, 319, 286, 361, 297, 323], "may2026Netsuite": 425, "may2026Ibm": 297, "may2026Gap": 128}, "soldSelectionReviewNote": "ממתין לאימות שלך — Looker מאושר: wolt_market_exploration/wolt_market_purchases (V ✅). לא להשתמש ב-wolt_market_data/wolt_market_purchases (לא מאושר). בחר וריאנט בדשבורד האינטראקטיבי לאחר פגישה עם המנהל.", "lookerRef": {"Sold from selection — sold_from_selection_perc": [89.8, 82.2, 90.63, null, null, null], "Sold from selection — sold_from_product_selection_perc": [null, null, null, null, null, null]}, "monthKeys": ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"], "monthLabels": ["Jan 26", "Feb 26", "Mar 26", "Apr 26", "May 26", "Jun 26", "Jul 26", "Aug 26", "Sep 26", "Oct 26", "Nov 26", "Dec 26"], "defaultTargets": {"Orders|2026-01": 386.0, "Orders|2026-02": 329.0, "Orders|2026-03": 357.0, "Orders|2026-04": 381.0, "Orders|2026-05": 410.0, "Orders|2026-06": 408.0, "Orders|2026-07": 447.0, "Orders|2026-08": 458.0, "Orders|2026-09": 460.0, "Orders|2026-10": 498.0, "Orders|2026-11": 481.0, "Orders|2026-12": 503.0, "DDE FEE/order|2026-01": 154.8, "DDE FEE/order|2026-02": 152.8, "DDE FEE/order|2026-03": 154.1, "DDE FEE/order|2026-04": 158.2, "DDE FEE/order|2026-05": 157.2, "DDE FEE/order|2026-06": 157.8, "DDE FEE/order|2026-07": 160.1, "DDE FEE/order|2026-08": 162.0, "DDE FEE/order|2026-09": 164.0, "DDE FEE/order|2026-10": 164.9, "DDE FEE/order|2026-11": 165.9, "DDE FEE/order|2026-12": 167.0, "Ftu Sessions|2026-01": 179.0, "Ftu Sessions|2026-02": 179.0, "Ftu Sessions|2026-03": 200.0, "Ftu Sessions|2026-04": 215.0, "Ftu Sessions|2026-05": 215.0, "Ftu Sessions|2026-06": 215.0, "Ftu Sessions|2026-07": 244.0, "Ftu Sessions|2026-08": 244.0, "Ftu Sessions|2026-09": 244.0, "Ftu Sessions|2026-10": 268.0, "Ftu Sessions|2026-11": 268.0, "Ftu Sessions|2026-12": 268.0, "Ftu Conversion|2026-01": 18.5, "Ftu Conversion|2026-02": 17.8, "Ftu Conversion|2026-03": 17.0, "Ftu Conversion|2026-04": 17.2, "Ftu Conversion|2026-05": 18.0, "Ftu Conversion|2026-06": 17.5, "Ftu Conversion|2026-07": 17.8, "Ftu Conversion|2026-08": 17.9, "Ftu Conversion|2026-09": 17.5, "Ftu Conversion|2026-10": 18.1, "Ftu Conversion|2026-11": 17.6, "Ftu Conversion|2026-12": 17.8, "Returning User Sessions|2026-01": 740.0, "Returning User Sessions|2026-02": 760.0, "Returning User Sessions|2026-03": 840.0, "Returning User Sessions|2026-04": 917.0, "Returning User Sessions|2026-05": 917.0, "Returning User Sessions|2026-06": 917.0, "Returning User Sessions|2026-07": 1042.0, "Returning User Sessions|2026-08": 1042.0, "Returning User Sessions|2026-09": 1042.0, "Returning User Sessions|2026-10": 1133.0, "Returning User Sessions|2026-11": 1133.0, "Returning User Sessions|2026-12": 1133.0, "Returning User Conversion|2026-01": 40.5, "Returning User Conversion|2026-02": 40.4, "Returning User Conversion|2026-03": 40.8, "Returning User Conversion|2026-04": 37.8, "Returning User Conversion|2026-05": 41.7, "Returning User Conversion|2026-06": 38.5, "Returning User Conversion|2026-07": 42.4, "Returning User Conversion|2026-08": 42.8, "Returning User Conversion|2026-09": 38.6, "Returning User Conversion|2026-10": 39.8, "Returning User Conversion|2026-11": 41.8, "Returning User Conversion|2026-12": 40.9, "PPM%|2026-01": 37.0, "PPM%|2026-02": 37.2, "PPM%|2026-03": 37.3, "PPM%|2026-04": 37.4, "PPM%|2026-05": 37.5, "PPM%|2026-06": 37.6, "PPM%|2026-07": 37.6, "PPM%|2026-08": 37.6, "PPM%|2026-09": 37.7, "PPM%|2026-10": 37.8, "PPM%|2026-11": 37.9, "PPM%|2026-12": 37.9, "Shrink/DDE FEE|2026-01": 1.5, "Shrink/DDE FEE|2026-02": 1.5, "Shrink/DDE FEE|2026-03": 1.6, "Shrink/DDE FEE|2026-04": 1.6, "Shrink/DDE FEE|2026-05": 1.7, "Shrink/DDE FEE|2026-06": 1.7, "Shrink/DDE FEE|2026-07": 1.7, "Shrink/DDE FEE|2026-08": 1.7, "Shrink/DDE FEE|2026-09": 1.4, "Shrink/DDE FEE|2026-10": 1.4, "Shrink/DDE FEE|2026-11": 1.3, "Shrink/DDE FEE|2026-12": 1.4, "OFL / order (ILS)|2026-01": 13.0, "OFL / order (ILS)|2026-02": 13.3, "OFL / order (ILS)|2026-03": 13.3, "OFL / order (ILS)|2026-04": 14.5, "OFL / order (ILS)|2026-05": 14.5, "OFL / order (ILS)|2026-06": 12.8, "OFL / order (ILS)|2026-07": 13.8, "OFL / order (ILS)|2026-08": 13.7, "OFL / order (ILS)|2026-09": 16.5, "OFL / order (ILS)|2026-10": 13.7, "OFL / order (ILS)|2026-11": 13.8, "OFL / order (ILS)|2026-12": 13.8, "VP%|2026-01": 0.9, "VP%|2026-02": 2.8, "VP%|2026-03": 1.2, "VP%|2026-04": -0.5, "VP%|2026-05": 3.9, "VP%|2026-06": 2.2, "VP%|2026-07": 2.0, "VP%|2026-08": 6.1, "VP%|2026-09": 1.8, "VP%|2026-10": 3.3, "VP%|2026-11": 4.4, "VP%|2026-12": 4.8, "Weighted Availability|2026-01": 92.0, "Weighted Availability|2026-02": 92.0, "Weighted Availability|2026-03": 90.5, "Weighted Availability|2026-04": 89.0, "Weighted Availability|2026-05": 90.0, "Weighted Availability|2026-06": 90.5, "Weighted Availability|2026-07": 91.5, "Weighted Availability|2026-08": 92.0, "Weighted Availability|2026-09": 89.0, "Weighted Availability|2026-10": 88.9, "Weighted Availability|2026-11": 91.0, "Weighted Availability|2026-12": 91.5, "KVI & Promo WA%|2026-01": 92.4, "KVI & Promo WA%|2026-02": 93.7, "KVI & Promo WA%|2026-03": 89.0, "KVI & Promo WA%|2026-04": 92.0, "KVI & Promo WA%|2026-05": 92.0, "KVI & Promo WA%|2026-06": 91.5, "KVI & Promo WA%|2026-07": 93.8, "KVI & Promo WA%|2026-08": 92.5, "KVI & Promo WA%|2026-09": 91.5, "KVI & Promo WA%|2026-10": 89.0, "KVI & Promo WA%|2026-11": 93.8, "KVI & Promo WA%|2026-12": 92.5, "Sold from selection (store level)|2026-01": 89.0, "Sold from selection (store level)|2026-02": 82.0, "Sold from selection (store level)|2026-03": 83.0, "Sold from selection (store level)|2026-04": 84.0, "Sold from selection (store level)|2026-05": 84.0, "Sold from selection (store level)|2026-06": 85.0, "Sold from selection (store level)|2026-07": 83.0, "Sold from selection (store level)|2026-08": 86.0, "Sold from selection (store level)|2026-09": 87.0, "Sold from selection (store level)|2026-10": 87.0, "Sold from selection (store level)|2026-11": 87.0, "Sold from selection (store level)|2026-12": 88.0, "POFR%|2026-01": 93.5, "POFR%|2026-02": 93.5, "POFR%|2026-03": 93.5, "POFR%|2026-04": 93.5, "POFR%|2026-05": 93.5, "POFR%|2026-06": 93.5, "POFR%|2026-07": 95.2, "POFR%|2026-08": 95.2, "POFR%|2026-09": 95.2, "POFR%|2026-10": 95.2, "POFR%|2026-11": 95.2, "POFR%|2026-12": 95.2, "Under 45min >|2026-01": 55.0, "Under 45min >|2026-02": 55.0, "Under 45min >|2026-03": 55.0, "Under 45min >|2026-04": 55.0, "Under 45min >|2026-05": 55.0, "Under 45min >|2026-06": 55.0, "Under 45min >|2026-07": 67.0, "Under 45min >|2026-08": 67.0, "Under 45min >|2026-09": 67.0, "Under 45min >|2026-10": 67.0, "Under 45min >|2026-11": 67.0, "Under 45min >|2026-12": 67.0, "Maintenance costs|2026-01": 280.0, "Maintenance costs|2026-02": 280.0, "Maintenance costs|2026-03": 280.0, "Maintenance costs|2026-04": 280.0, "Maintenance costs|2026-05": 300.0, "Maintenance costs|2026-06": 310.0, "Maintenance costs|2026-07": 330.0, "Maintenance costs|2026-08": 330.0, "Maintenance costs|2026-09": 330.0, "Maintenance costs|2026-10": 340.0, "Maintenance costs|2026-11": 340.0, "Maintenance costs|2026-12": 340.0, "Fulfillment & Drive partner|2026-01": 83333.0, "Fulfillment & Drive partner|2026-02": 83333.0, "Fulfillment & Drive partner|2026-03": 83333.0, "Fulfillment & Drive partner|2026-04": 83333.0, "Fulfillment & Drive partner|2026-05": 83333.0, "Fulfillment & Drive partner|2026-06": 83333.0, "Turning B stores to A|2026-01": 1.0, "Turning B stores to A|2026-02": 1.0, "Turning B stores to A|2026-03": 1.0, "Turning B stores to A|2026-04": 1.0, "Turning B stores to A|2026-05": 1.0, "Turning B stores to A|2026-06": 1.0, "Turning B stores to A|2026-07": 1.0, "Turning B stores to A|2026-08": 1.0, "Turning B stores to A|2026-09": 1.0, "Turning B stores to A|2026-10": 1.0, "Turning B stores to A|2026-11": 1.0, "Turning B stores to A|2026-12": 1.0, "Avg Units per Order|2026-01": 11.6, "Avg Units per Order|2026-02": 11.6, "Avg Units per Order|2026-03": 11.6, "Avg Units per Order|2026-04": 11.8, "Avg Units per Order|2026-05": 11.8, "Avg Units per Order|2026-06": 11.8, "Avg Units per Order|2026-07": 12.15, "Avg Units per Order|2026-08": 12.15, "Avg Units per Order|2026-09": 12.15, "Avg Units per Order|2026-10": 12.32, "Avg Units per Order|2026-11": 12.32, "Avg Units per Order|2026-12": 12.32, "Order Frequency|2026-01": 2.3, "Order Frequency|2026-02": 2.3, "Order Frequency|2026-03": 2.3, "Order Frequency|2026-04": 2.4, "Order Frequency|2026-05": 2.4, "Order Frequency|2026-06": 2.4, "Order Frequency|2026-07": 2.55, "Order Frequency|2026-08": 2.55, "Order Frequency|2026-09": 2.55, "Order Frequency|2026-10": 2.65, "Order Frequency|2026-11": 2.65, "Order Frequency|2026-12": 2.65, "Penetration Rate|2026-01": 14.6, "Penetration Rate|2026-02": 14.6, "Penetration Rate|2026-03": 14.6, "Penetration Rate|2026-04": 15.0, "Penetration Rate|2026-05": 15.0, "Penetration Rate|2026-06": 15.0, "Penetration Rate|2026-07": 15.5, "Penetration Rate|2026-08": 15.5, "Penetration Rate|2026-09": 15.5, "Penetration Rate|2026-10": 16.0, "Penetration Rate|2026-11": 16.0, "Penetration Rate|2026-12": 16.0, "Area Product Selection|2026-01": 4850.0, "Area Product Selection|2026-02": 5000.0, "Area Product Selection|2026-03": 5100.0, "Area Product Selection|2026-04": 5100.0, "Area Product Selection|2026-05": 5100.0, "Area Product Selection|2026-06": 5200.0, "Area Product Selection|2026-07": 5250.0, "Area Product Selection|2026-08": 5250.0, "Area Product Selection|2026-09": 5300.0, "Area Product Selection|2026-10": 5400.0, "Area Product Selection|2026-11": 5400.0, "Area Product Selection|2026-12": 5400.0, "%Fresh Food / DDE|2026-01": 38.3, "%Fresh Food / DDE|2026-02": 38.3, "%Fresh Food / DDE|2026-03": 38.3, "%Fresh Food / DDE|2026-04": 38.4, "%Fresh Food / DDE|2026-05": 38.4, "%Fresh Food / DDE|2026-06": 38.4, "%Fresh Food / DDE|2026-07": 38.4, "%Fresh Food / DDE|2026-08": 38.5, "%Fresh Food / DDE|2026-09": 38.6, "%Fresh Food / DDE|2026-10": 38.8, "%Fresh Food / DDE|2026-11": 38.8, "%Fresh Food / DDE|2026-12": 38.9, "IDQ|2026-01": 97.7, "IDQ|2026-02": 97.7, "IDQ|2026-03": 97.65, "IDQ|2026-04": 98.0, "IDQ|2026-05": 98.0, "IDQ|2026-06": 98.0, "IDQ|2026-07": 98.5, "IDQ|2026-08": 98.5, "IDQ|2026-09": 98.5, "IDQ|2026-10": 99.0, "IDQ|2026-11": 99.0, "IDQ|2026-12": 99.0, "UPH >|2026-01": 119.5, "UPH >|2026-02": 120.2, "UPH >|2026-03": 119.9, "UPH >|2026-04": 120.3, "UPH >|2026-05": 118.4, "UPH >|2026-06": 118.1, "UPH >|2026-07": 117.6, "UPH >|2026-08": 120.1, "UPH >|2026-09": 122.0, "UPH >|2026-10": 126.1, "UPH >|2026-11": 127.5, "UPH >|2026-12": 120.5}, "defaultTargetsNote": "OKR 2026 target spreadsheet · Jan–Dec 2026", "actuals": {"Orders": [351, 321, 328, 340, 382, 371, null, null, null, null, null, null], "DDE FEE/order": [159.2, 158.8, 169.4, 154.7, 161.2, 162.0, null, null, null, null, null, null], "Ftu Sessions": [179, 159, 190, 197, 158, 143, null, null, null, null, null, null], "Ftu Conversion": [20.2, 18.8, 15.5, 16.3, 17.5, 18.0, null, null, null, null, null, null], "Returning User Sessions": [740, 708, 850, 873, 594, 557, null, null, null, null, null, null], "Returning User Conversion": [42.4, 41.4, 34.5, 34.9, 40.5, 41.3, null, null, null, null, null, null], "PPM%": [36.9, 36.6, 37.0, 36.7, 37.5, 38.7, null, null, null, null, null, null], "Shrink/DDE FEE": [1.49, 1.35, 1.1, 1.34, 1.43, 1.34, null, null, null, null, null, null], "OFL / order (ILS)": [14.2, 15.2, 19.1, 16.4, 17.4, 14.7, null, null, null, null, null, null], "VP%": [-1.8, 0.2, -33.4, -0.5, -0.4, -0.3, null, null, null, null, null, null], "Weighted Availability": [92.7, 89.6, 83.5, 77.7, 86.6, 86.3, null, null, null, null, null, null], "KVI & Promo WA%": [93.5, 89.7, 86.4, 82.3, 87.7, 87.8, null, null, null, null, null, null], "Sold from selection — sold_from_selection_perc": [89.8, 82.18, 90.6, 90.49, 90.18, 89.59, null, null, null, null, null, null], "Sold from selection — sold_from_product_selection_perc": [86.34, 79.34, 85.7, 90.75, 89.3, 89.31, null, null, null, null, null, null], "POFR%": [89.8, 88.6, 88.4, 89.5, 88.1, 87.8, null, null, null, null, null, null], "Under 45min >": [50.1, 57.4, 45.7, 55.4, 50.5, 49.9, null, null, null, null, null, null], "New Stores": [null, null, null, null, null, null, null, null, null, null, null, null], "Expansion": [null, null, null, null, null, null, null, null, null, null, null, null], "Relocation": [null, null, null, null, null, null, null, null, null, null, null, null], "Maintenance costs": [315, 319, 286, 361, 297, 323, null, null, null, null, null, null], "Utilities costs reduce": [null, null, null, null, null, null, null, null, null, null, null, null], "Fulfillment & Drive partner": [null, null, null, null, null, null, null, null, null, null, null, null], "3PFL GOV (yearly)": [null, null, null, null, null, null, null, null, null, null, null, null], "Robotic store": [null, null, null, null, null, null, null, null, null, null, null, null], "Turning B stores to A": [null, null, null, null, null, null, null, null, null, null, null, null], "Avg Units per Order": [11.7, 11.6, 12.2, 11.3, 11.3, 11.4, null, null, null, null, null, null], "Order Frequency": [2.98, 2.85, 3.32, 3.11, 3.04, 3.03, null, null, null, null, null, null], "Penetration Rate": [14.5, 14.3, 12.8, 15.1, 15.6, 14.8, null, null, null, null, null, null], "Awareness": [null, null, null, null, null, null, null, null, null, null, null, null], "New special vendors or categories": [null, null, null, null, null, null, null, null, null, null, null, null], "Area Product Selection": [4466, 4535, 4292, 3743, 4316, 4591, null, null, null, null, null, null], "%Fresh Food / DDE": [38.98, 38.47, 40.0, null, null, null, null, null, null, null, null, null], "IDQ": [95.14, 95.18, 95.37, 95.59, 95.63, 95.86, null, null, null, null, null, null], "VSL": [74.3, 67.9, 61.7, 52.6, 59.3, 63.6, null, null, null, null, null, null], "DC": [null, null, null, null, null, null, null, null, null, null, null, null], "Forecast accuracy +/-": [null, null, null, null, null, null, null, null, null, null, null, null], "UP-TIME >": [97.2, 96.0, 90.9, 96.5, 85.6, 97.5, null, null, null, null, null, null], "UPH >": [null, null, null, null, null, null, null, null, null, null, null, null], "% Bad Goods Rating": [1.49, 1.36, 1.34, 1.44, 1.47, 1.5, null, null, null, null, null, null], "Attrition (monthly) <": [null, null, null, null, null, null, null, null, null, null, null, null], "IDP & HQ training": [null, null, null, null, null, null, null, null, null, null, null, null], "Internal Mobility": [null, null, null, null, null, null, null, null, null, null, null, null], "OPS Training": [null, null, null, null, null, null, null, null, null, null, null, null], "Store employees absence <": [null, null, null, null, null, null, null, null, null, null, null, null], "Early Attrition (0-3) <": [null, null, null, null, null, null, null, null, null, null, null, null], "Engagme >1 (HV)": [null, null, null, null, null, null, null, null, null, null, null, null], "Engagme >1 (HQ)": [null, null, null, null, null, null, null, null, null, null, null, null], "EngagMe growth": [null, null, null, null, null, null, null, null, null, null, null, null]}, "defaultOwners": {"Orders": {"leader": "OPS", "partner": "CAT/MKT"}, "DDE FEE/order": {"leader": "CAT", "partner": "MKT"}, "Ftu Sessions": {"leader": "MKT", "partner": ""}, "Ftu Conversion": {"leader": "CAT", "partner": "SC"}, "Returning User Sessions": {"leader": "MKT", "partner": ""}, "Returning User Conversion": {"leader": "CAT", "partner": "SC"}, "PPM%": {"leader": "CAT", "partner": ""}, "Shrink/DDE FEE": {"leader": "SC", "partner": "CAT/OPS"}, "OFL / order (ILS)": {"leader": "OPS", "partner": ""}, "VP%": {"leader": "General", "partner": ""}, "Weighted Availability": {"leader": "SC", "partner": ""}, "KVI & Promo WA%": {"leader": "SC", "partner": ""}, "Sold from selection — sold_from_selection_perc": {"leader": "CAT & Content", "partner": ""}, "Sold from selection — sold_from_product_selection_perc": {"leader": "CAT & Content", "partner": ""}, "POFR%": {"leader": "OPS", "partner": ""}, "Under 45min >": {"leader": "OPS", "partner": ""}, "New Stores": {"leader": "Exp", "partner": ""}, "Expansion": {"leader": "Exp", "partner": ""}, "Relocation": {"leader": "Exp", "partner": ""}, "Maintenance costs": {"leader": "Exp", "partner": ""}, "Utilities costs reduce": {"leader": "Exp", "partner": ""}, "Fulfillment & Drive partner": {"leader": "Exp", "partner": ""}, "3PFL GOV (yearly)": {"leader": "Exp", "partner": ""}, "Robotic store": {"leader": "Exp", "partner": ""}, "Turning B stores to A": {"leader": "Exp", "partner": "OPS"}, "Avg Units per Order": {"leader": "Marketing", "partner": ""}, "Order Frequency": {"leader": "Marketing", "partner": ""}, "Penetration Rate": {"leader": "Marketing", "partner": ""}, "Awareness": {"leader": "Marketing", "partner": ""}, "New special vendors or categories": {"leader": "CAT & Content", "partner": ""}, "Area Product Selection": {"leader": "CAT & Content", "partner": ""}, "%Fresh Food / DDE": {"leader": "CAT & Content", "partner": ""}, "IDQ": {"leader": "CAT & Content", "partner": ""}, "VSL": {"leader": "CAT & Content", "partner": "SC"}, "DC": {"leader": "SC", "partner": ""}, "Forecast accuracy +/-": {"leader": "SC", "partner": ""}, "UP-TIME >": {"leader": "OPS", "partner": ""}, "UPH >": {"leader": "OPS", "partner": "SC"}, "% Bad Goods Rating": {"leader": "OPS", "partner": "Marketing"}, "Attrition (monthly) <": {"leader": "OPS", "partner": ""}, "IDP & HQ training": {"leader": "HR", "partner": ""}, "Internal Mobility": {"leader": "HR", "partner": ""}, "OPS Training": {"leader": "HR", "partner": ""}, "Store employees absence <": {"leader": "HR", "partner": ""}, "Early Attrition (0-3) <": {"leader": "HR", "partner": ""}, "Engagme >1 (HV)": {"leader": "HR", "partner": ""}, "Engagme >1 (HQ)": {"leader": "HR", "partner": ""}, "EngagMe growth": {"leader": "HR", "partner": ""}, "Sold from selection (store level)": {"leader": "CAT & Content", "partner": ""}}, "looker": {"Orders": {"label": "UE — ISR WM (Look 47217)", "url": "https://looker.wolt.com/looks/47217?toggle=dat,fil,pik,vis&qid=y3cisQW6TChlI5Ohvh9HPa"}, "DDE FEE/order": {"label": "UE — ISR WM DDE (Look 47217)", "url": "https://looker.wolt.com/looks/47217?toggle=dat,fil,pik,vis&qid=y3cisQW6TChlI5Ohvh9HPa"}, "Ftu Sessions": {"label": "WM Venue Conversion — Sessions (Essi ✅)", "url": "https://looker.wolt.com/explore/wolt_market_data/wolt_market_venue_conversion?qid=FL8rFCRNmUEOHI6T0oueNI&toggle=dat,fil,vis"}, "Ftu Conversion": {"label": "WM Venue Conversion — CVR (Essi ✅)", "url": "https://looker.wolt.com/explore/wolt_market_data/wolt_market_venue_conversion?qid=FL8rFCRNmUEOHI6T0oueNI&toggle=dat,fil,vis"}, "Returning User Sessions": {"label": "WM Venue Conversion — Sessions (Essi ✅)", "url": "https://looker.wolt.com/explore/wolt_market_data/wolt_market_venue_conversion?qid=FL8rFCRNmUEOHI6T0oueNI&toggle=dat,fil,vis"}, "Returning User Conversion": {"label": "WM Venue Conversion — CVR (Essi ✅)", "url": "https://looker.wolt.com/explore/wolt_market_data/wolt_market_venue_conversion?qid=FL8rFCRNmUEOHI6T0oueNI&toggle=dat,fil,vis"}, "PPM%": {"label": "UE — ISR WM (Look 47217)", "url": "https://looker.wolt.com/looks/47217?toggle=dat,fil,pik,vis&qid=y3cisQW6TChlI5Ohvh9HPa"}, "Shrink/DDE FEE": {"label": "Golden SCM — Shrink/DDE FEE (106617)", "url": "https://looker.wolt.com/dashboards/106617?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "OFL / order (ILS)": {"label": "Wolt Market Unit Economics (Look 47217)", "url": "https://looker.wolt.com/looks/47217?toggle=dat,fil,pik,vis&qid=y3cisQW6TChlI5Ohvh9HPa"}, "VP%": {"label": "IBM — planning_metrics_actuals", "url": ""}, "Weighted Availability": {"label": "Golden SCM — ISR (106617)", "url": "https://looker.wolt.com/dashboards/106617?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "KVI & Promo WA%": {"label": "Golden SCM — ISR (106617)", "url": "https://looker.wolt.com/dashboards/106617?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "Sold from selection — sold_from_selection_perc": {"label": "Purchases (exploration) — Sold from Selection %", "url": "https://looker.wolt.com/explore/wolt_market_exploration/wolt_market_purchases?qid=hsd9wd9lNsKvuu1M3czQgv&toggle=fil,vis"}, "Sold from selection — sold_from_product_selection_perc": {"label": "Purchases (exploration) — Sold from Product Selection %", "url": "https://looker.wolt.com/explore/wolt_market_exploration/wolt_market_purchases?qid=hsd9wd9lNsKvuu1M3czQgv&toggle=fil,vis"}, "POFR%": {"label": "WM Venue Metrics Aggregated — POFR (ISR)", "url": "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated?qid=uYst64GAXk7COWPNzoLPTC&origin_space=27423&toggle=fil,vis"}, "Under 45min >": {"label": "WM Store Ops — Under 45min (ISR)", "url": "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_store_ops_reporting?fields=wolt_market_store_ops_reporting.metric_date,wolt_market_store_ops_reporting.delivered_under_45_minutes_orders_rate,wolt_market_store_ops_reporting.delivered_under_45_minutes_orders_count&f[wolt_market_store_ops_reporting.venue_country]=ISR&f[wolt_market_store_ops_reporting.franchise_name]=woltmarket&f[wolt_market_store_ops_reporting.period]=month&sorts=wolt_market_store_ops_reporting.metric_date+desc&limit=6&toggle=dat,fil,vis"}, "New Stores": {"label": "", "url": ""}, "Expansion": {"label": "", "url": ""}, "Relocation": {"label": "", "url": ""}, "Maintenance costs": {"label": "NetSuite Mgmt PL — 87310 (reconciliation)", "url": ""}, "Utilities costs reduce": {"label": "", "url": ""}, "Fulfillment & Drive partner": {"label": "", "url": ""}, "3PFL GOV (yearly)": {"label": "", "url": ""}, "Robotic store": {"label": "", "url": ""}, "Turning B stores to A": {"label": "", "url": ""}, "Avg Units per Order": {"label": "Golden Growth — ISR (106613)", "url": "https://looker.wolt.com/dashboards/106613?Period=month&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Area+Selector=country&Reporting+Region=&Franchise+Name=woltmarket&Country=ISR&Secondary+Product+Line=supermarket&Lookback+Periods=6&Metric+Area=country"}, "Order Frequency": {"label": "Golden Growth — ISR (106613)", "url": "https://looker.wolt.com/dashboards/106613?Period=month&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Area+Selector=country&Reporting+Region=&Franchise+Name=woltmarket&Country=ISR&Secondary+Product+Line=supermarket&Lookback+Periods=6&Metric+Area=country"}, "Penetration Rate": {"label": "Golden Growth — ISR (106613)", "url": "https://looker.wolt.com/dashboards/106613?Period=month&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Area+Selector=country&Reporting+Region=&Franchise+Name=woltmarket&Country=ISR&Secondary+Product+Line=supermarket&Lookback+Periods=6&Metric+Area=country"}, "Awareness": {"label": "", "url": ""}, "New special vendors or categories": {"label": "", "url": ""}, "Area Product Selection": {"label": "Golden Selection — ISR (106615)", "url": "https://looker.wolt.com/dashboards/106615?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "%Fresh Food / DDE": {"label": "—", "url": ""}, "IDQ": {"label": "Golden Selection — ISR (106615)", "url": "https://looker.wolt.com/dashboards/106615?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "VSL": {"label": "Golden SCM — ISR (106617)", "url": "https://looker.wolt.com/dashboards/106617?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "DC": {"label": "", "url": ""}, "Forecast accuracy +/-": {"label": "", "url": ""}, "UP-TIME >": {"label": "Golden Store Ops — ISR (106616)", "url": "https://looker.wolt.com/dashboards/106616?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "UPH >": {"label": "", "url": ""}, "% Bad Goods Rating": {"label": "Golden Store Ops — Bad Goods Rating % (106616)", "url": "https://looker.wolt.com/dashboards/106616?Metric+Area=country&Period=month&Lookback+Periods=6&Include+Ongoing+Period=no&Currency+and+Exchange+Rate+Selector=pla&Reporting+Region=&Country=ISR&City=&Venue+Name=&Franchise+Name=woltmarket&Secondary+Product+Line=supermarket&Venue+Status="}, "Attrition (monthly) <": {"label": "", "url": ""}, "IDP & HQ training": {"label": "", "url": ""}, "Internal Mobility": {"label": "", "url": ""}, "OPS Training": {"label": "", "url": ""}, "Store employees absence <": {"label": "", "url": ""}, "Early Attrition (0-3) <": {"label": "", "url": ""}, "Engagme >1 (HV)": {"label": "", "url": ""}, "Engagme >1 (HQ)": {"label": "", "url": ""}, "EngagMe growth": {"label": "", "url": ""}}, "scApproval": {"Orders": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 (Ziwei)", "DDE FEE/order": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217", "Ftu Sessions": "✅ verified by user · Essi (21 May 2026): session counts and session-based conversion are fine to use; double-counting affects user/client counts only, not sessions. · Venue Conversion (Essi ✅)", "Ftu Conversion": "✅ verified by user · Essi (21 May 2026): session counts and session-based conversion are fine to use; double-counting affects user/client counts only, not sessions. · Venue Conversion (Essi ✅)", "Returning User Sessions": "✅ verified by user · Essi (21 May 2026): session counts and session-based conversion are fine to use; double-counting affects user/client counts only, not sessions. · Venue Conversion (Essi ✅)", "Returning User Conversion": "✅ verified by user · Essi (21 May 2026): session counts and session-based conversion are fine to use; double-counting affects user/client counts only, not sessions. · Venue Conversion (Essi ✅)", "PPM%": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 · Product Profit Margin %", "Shrink/DDE FEE": "Golden SCM 106617 — Snowflake auto · Golden SCM 106617 — Shrinkage Share of Subtotal (Wolt Market Metrics · woltmarket · supermarket · PLA · Metric Area=country) · Snowflake: AVG store (SHRINKED_UNITS_VALUE ÷ TOTAL_SUBTOTAL_LOCAL), round 1dp then avg", "OFL / order (ILS)": "✅ verified by user · Wolt Market UE · Wolt Market Unit Economics — ORDER_FULFILLMENT_LABOR_RECON (ISR, IS_WOLT_MARKET)", "VP%": "✅ verified by user · IBM planning_metrics_actuals — Variable Profit ÷ GOV (Retail 1P, day sum; IBM UI in €)", "Weighted Availability": "✅ verified by user · Golden Dashboard 106617 — MART weighted_availability numerator ÷ denominator (ISR Wolt Market stores, country aggregate)", "KVI & Promo WA%": "✅ verified by user · Golden Dashboard 106617 — KVI Category Promo Weighted Availability % (MART kvi_cat_promo weighted_availability numerator ÷ denominator)", "Sold from selection — sold_from_selection_perc": "ממתין לאימות · exploration Purchases V ✅ · ממתין לאימות שלך — Looker מאושר: wolt_market_exploration/wolt_market_purchases (V ✅). לא להשתמש ב-wolt_market_data/wolt_market_purchases (לא מאושר). בחר וריאנט בדשבורד האינטראקטיבי לאחר פגישה עם המנהל.", "Sold from selection — sold_from_product_selection_perc": "ממתין לאימות · exploration Purchases V ✅ · ממתין לאימות שלך — Looker מאושר: wolt_market_exploration/wolt_market_purchases (V ✅). לא להשתמש ב-wolt_market_data/wolt_market_purchases (לא מאושר). בחר וריאנט בדשבורד האינטראקטיבי לאחר פגישה עם המנהל.", "POFR%": "✅ verified by user · Golden Store Ops 106616 / wolt_market_venue_metrics_aggregated — MART perfect_order_fulfillment_ratio numerator ÷ denominator (ISR Wolt Market stores, country aggregate)", "Under 45min >": "✅ verified by user · WM Store Ops reporting V ✅ · MART delivered_under_45_minutes_orders_rate", "Maintenance costs": "לבדיקה · IBM Store Maintenance ≠ NetSuite 87310 — Snowflake role לא רואה leaf; ערכי הדשבורד = IBM Pulse fallback. ממתין ל-reconciliation מול Mgmt PL / finance.", "Avg Units per Order": "✅ verified by user · Golden Growth 106613 · TOTAL_UNITS ÷ TOTAL_ORDERS (ISR network row)", "Order Frequency": "✅ verified by user · Golden Growth 106613 · MART ORDER_FREQUENCY (purchases ÷ distinct retail users)", "Penetration Rate": "✅ verified by user · Golden Growth 106613 · Active Users % of Country MAU", "Area Product Selection": "✅ verified by user · Golden Selection 106615 · Available Selection (MART per active WM store)", "%Fresh Food / DDE": "Manual entry in Looker OKR sheet", "IDQ": "Golden Selection 106615 — Item Data Quality ✅ verified by user", "VSL": "Golden SCM 106617 — Vendor Service Level ✅ verified by user", "UP-TIME >": "Golden Store Ops 106616 — Weighted Uptime ✅ verified by user", "% Bad Goods Rating": "✅ verified by user · Golden Store Ops 106616 — Bad Goods Rating % (Period=month, ISR)"}, "userVerified": ["% Bad Goods Rating", "Area Product Selection", "Avg Units per Order", "DDE FEE/order", "Ftu Conversion", "Ftu Sessions", "IDQ", "KVI & Promo WA%", "OFL / order (ILS)", "Order Frequency", "Orders", "POFR%", "PPM%", "Penetration Rate", "Returning User Conversion", "Returning User Sessions", "UP-TIME >", "Under 45min >", "VP%", "VSL", "Weighted Availability"], "essiSession": {"meta": "Essi Grönroos · #ask-consumer-analytics · 21 May 2026", "quote": "After more investigation, session counts and session-based conversion in Wolt Market Venue Conversion are actually fine to use. The double-counting issue only affects user/client counts (due to the hourly grain of the underlying data), not sessions.\n\nSo if your targets were set on session-based CVR, you can safely keep using that from Venue Conversion as a bridge. For user counts, use the new WM Venue Metrics 🙂", "noteHe": "Essi (21 May 2026): מותר להשתמש בספירת סשנים ובהמרה session-based — double-counting משפיע רק על user/client counts, לא על סשנים.", "slackUrl": "https://wolt.enterprise.slack.com/archives/C04M2CK74BF/p1779350276025539?thread_ts=1775055446.070239&cid=C04M2CK74BF", "venueConversionUrl": "https://looker.wolt.com/explore/wolt_market_data/wolt_market_venue_conversion?qid=FL8rFCRNmUEOHI6T0oueNI&toggle=dat,fil,vis", "kpiDeprecatedUrl": "https://looker.wolt.com/explore/kpi_data/wolt_market_metrics?fields=wolt_market_metrics.date,wolt_market_metrics.ftu_sessions,wolt_market_metrics.ftu_orders,wolt_market_metrics.ftu_conversion,wolt_market_metrics.ftu_wolt_market,wolt_market_metrics.returning_user_sessions,wolt_market_metrics.returning_user_conversion&f[wolt_market_metrics.country]=ISR&f[wolt_market_metrics.period]=month&f[wolt_market_metrics.area]=country&sorts=wolt_market_metrics.date+desc&limit=6&toggle=dat,fil,vis", "kpiDeprecatedLabel": "kpi_data/wolt_market_metrics — deprecated (Essi: לא להסתמך, אפריל–מאי 2026)", "venueApprovedLabel": "wolt_market_data/wolt_market_venue_conversion — Essi: סשנים + session-based CVR בסדר", "svenjaNote": "Svenja (מאי 2026): ב-Venue Conversion אין פיצול FTU/Returning מובנה — OKR דורש שדות נפרדים מ-Snowflake presentation.wolt_market_metrics."}, "essiSessionNote": "Essi (21 May 2026): מותר להשתמש בספירת סשנים ובהמרה session-based — double-counting משפיע רק על user/client counts, לא על סשנים.", "essiSessionSlack": "https://wolt.enterprise.slack.com/archives/C04M2CK74BF/p1779350276025539?thread_ts=1775055446.070239&cid=C04M2CK74BF", "aliases": {"Orders": "Purchases / # Orders", "DDE FEE/order": "Wolt Market Subtotal VAT0 / Purchase", "Ftu Sessions": "Sessions — New to Venue / FTU (אלפים)", "Ftu Conversion": "New to Venue Conversion (session-based)", "Returning User Sessions": "Sessions — Returning / Repeat (אלפים)", "Returning User Conversion": "Repeat Venue Conversion (session-based)", "PPM%": "Product Profit Margin %", "Shrink/DDE FEE": "Shrinkage Share of Subtotal (Golden 106617)", "OFL / order (ILS)": "ORDER_FULFILLMENT_LABOR_RECON / Purchase", "Maintenance costs": "NetSuite 87310 Store maintenance (kILS; IBM reconciliation pending)", "VP%": "Variable Profit ÷ GOV (IBM)", "Weighted Availability": "Weighted Availability % (Golden / MART)", "KVI & Promo WA%": "KVI Category Promo Weighted Availability %", "Sold from selection — sold_from_selection_perc": "sold_from_selection_perc (exploration Purchases)", "Sold from selection — sold_from_product_selection_perc": "sold_from_product_selection_perc (exploration Purchases)", "POFR%": "Perfect Order Fulfillment Rate %", "Under 45min >": "Delivered Under 45 Minutes %", "Avg Units per Order": "Avg Units per Order", "Order Frequency": "Order Frequency", "Penetration Rate": "Active Users % of Country MAU", "Area Product Selection": "Available Selection (Golden Selection 106615)", "VSL": "Vendor Service Level % (Golden SCM 106617 · ISR incl. DC)", "UP-TIME >": "Weighted Uptime %", "% Bad Goods Rating": "Bad Goods Rating % — Golden Store Ops 106616", "IDQ": "Item Data Quality (Golden Selection 106615)", "Sold from selection (store level)": "Sold from selection (store level)"}, "sources": {"Orders": "snowflake_validated", "DDE FEE/order": "snowflake_validated", "Ftu Sessions": "snowflake_validated", "Ftu Conversion": "snowflake_validated", "Returning User Sessions": "snowflake_validated", "Returning User Conversion": "snowflake_validated", "PPM%": "snowflake_validated", "Shrink/DDE FEE": "snowflake_validated", "OFL / order (ILS)": "snowflake_validated", "VP%": "snowflake_validated", "Weighted Availability": "snowflake_validated", "KVI & Promo WA%": "snowflake_validated", "Sold from selection — sold_from_selection_perc": "looker_not_approved", "Sold from selection — sold_from_product_selection_perc": "looker_not_approved", "POFR%": "snowflake_validated", "Under 45min >": "snowflake_validated", "New Stores": "manual_entry", "Expansion": "manual_entry", "Relocation": "manual_entry", "Maintenance costs": "for_review", "Utilities costs reduce": "manual_entry", "Fulfillment & Drive partner": "manual_entry", "3PFL GOV (yearly)": "manual_entry", "Robotic store": "manual_entry", "Turning B stores to A": "manual_entry", "Avg Units per Order": "snowflake_validated", "Order Frequency": "snowflake_validated", "Penetration Rate": "snowflake_validated", "Awareness": "manual_entry", "New special vendors or categories": "manual_entry", "Area Product Selection": "snowflake_validated", "%Fresh Food / DDE": "manual_entry", "IDQ": "snowflake_validated", "VSL": "snowflake_validated", "DC": "manual_entry", "Forecast accuracy +/-": "manual_entry", "UP-TIME >": "snowflake_validated", "UPH >": "manual_entry", "% Bad Goods Rating": "snowflake_validated", "Attrition (monthly) <": "manual_entry", "IDP & HQ training": "manual_entry", "Internal Mobility": "manual_entry", "OPS Training": "manual_entry", "Store employees absence <": "manual_entry", "Early Attrition (0-3) <": "manual_entry", "Engagme >1 (HV)": "manual_entry", "Engagme >1 (HQ)": "manual_entry", "EngagMe growth": "manual_entry"}, "dataSource": {"Orders": "snowflake", "DDE FEE/order": "snowflake", "Ftu Sessions": "snowflake", "Ftu Conversion": "snowflake", "Returning User Sessions": "snowflake", "Returning User Conversion": "snowflake", "PPM%": "snowflake", "Shrink/DDE FEE": "snowflake", "OFL / order (ILS)": "snowflake", "VP%": "snowflake", "Weighted Availability": "snowflake", "KVI & Promo WA%": "snowflake", "Sold from selection — sold_from_selection_perc": "snowflake", "Sold from selection — sold_from_product_selection_perc": "snowflake", "POFR%": "snowflake", "Under 45min >": "snowflake", "New Stores": "manual", "Expansion": "manual", "Relocation": "manual", "Maintenance costs": "manual", "Utilities costs reduce": "manual", "Fulfillment & Drive partner": "manual", "3PFL GOV (yearly)": "manual", "Robotic store": "manual", "Turning B stores to A": "manual", "Avg Units per Order": "snowflake", "Order Frequency": "snowflake", "Penetration Rate": "snowflake", "Awareness": "manual", "New special vendors or categories": "manual", "Area Product Selection": "snowflake", "%Fresh Food / DDE": "manual", "IDQ": "snowflake", "VSL": "snowflake", "DC": "manual", "Forecast accuracy +/-": "manual", "UP-TIME >": "snowflake", "UPH >": "manual", "% Bad Goods Rating": "snowflake", "Attrition (monthly) <": "manual", "IDP & HQ training": "manual", "Internal Mobility": "manual", "OPS Training": "manual", "Store employees absence <": "manual", "Early Attrition (0-3) <": "manual", "Engagme >1 (HV)": "manual", "Engagme >1 (HQ)": "manual", "EngagMe growth": "manual"}, "direction": {"Orders": "higher", "DDE FEE/order": "higher", "Ftu Sessions": "higher", "Ftu Conversion": "higher", "Returning User Sessions": "higher", "Returning User Conversion": "higher", "PPM%": "higher", "Shrink/DDE FEE": "lower", "OFL / order (ILS)": "lower", "VP%": "higher", "Weighted Availability": "higher", "KVI & Promo WA%": "higher", "Sold from selection — sold_from_selection_perc": "higher", "Sold from selection — sold_from_product_selection_perc": "higher", "POFR%": "higher", "Under 45min >": "higher", "New Stores": "higher", "Expansion": "higher", "Relocation": "higher", "Maintenance costs": "lower", "Utilities costs reduce": "lower", "Fulfillment & Drive partner": "higher", "3PFL GOV (yearly)": "higher", "Robotic store": "higher", "Turning B stores to A": "higher", "Avg Units per Order": "higher", "Order Frequency": "higher", "Penetration Rate": "higher", "Awareness": "higher", "New special vendors or categories": "higher", "Area Product Selection": "higher", "%Fresh Food / DDE": "higher", "IDQ": "higher", "VSL": "higher", "DC": "higher", "Forecast accuracy +/-": "higher", "UP-TIME >": "higher", "UPH >": "higher", "% Bad Goods Rating": "higher", "Attrition (monthly) <": "lower", "IDP & HQ training": "higher", "Internal Mobility": "higher", "OPS Training": "higher", "Store employees absence <": "lower", "Early Attrition (0-3) <": "lower", "Engagme >1 (HV)": "higher", "Engagme >1 (HQ)": "higher", "EngagMe growth": "higher"}, "hints": {"Orders": "Thousands (K)", "Ftu Sessions": "Thousands (K)", "Returning User Sessions": "Thousands (K)", "VSL": "ISR country incl. DC"}, "format": {"Orders": "integer", "DDE FEE/order": "decimal:1", "Ftu Sessions": "integer", "Ftu Conversion": "percent:1", "Returning User Sessions": "integer", "Returning User Conversion": "percent:1", "PPM%": "percent:1", "Shrink/DDE FEE": "percent:2", "OFL / order (ILS)": "decimal:1", "VP%": "percent:1", "Weighted Availability": "percent:1", "KVI & Promo WA%": "percent:1", "Sold from selection — sold_from_selection_perc": "percent:2", "Sold from selection — sold_from_product_selection_perc": "percent:2", "POFR%": "percent:1", "Under 45min >": "percent:1", "New Stores": "integer", "Expansion": "integer", "Relocation": "integer", "Maintenance costs": "integer", "Utilities costs reduce": "percent:1", "Fulfillment & Drive partner": "decimal:1", "3PFL GOV (yearly)": "integer", "Robotic store": "integer", "Turning B stores to A": "integer", "Avg Units per Order": "decimal:1", "Order Frequency": "decimal:2", "Penetration Rate": "percent:1", "Awareness": "percent:1", "New special vendors or categories": "integer", "Area Product Selection": "integer", "%Fresh Food / DDE": "percent:2", "IDQ": "percent:2", "VSL": "percent:1", "DC": "integer", "Forecast accuracy +/-": "percent:1", "UP-TIME >": "percent:1", "UPH >": "decimal:1", "% Bad Goods Rating": "percent:2", "Attrition (monthly) <": "percent:1", "IDP & HQ training": "percent:1", "Internal Mobility": "percent:1", "OPS Training": "percent:1", "Store employees absence <": "percent:1", "Early Attrition (0-3) <": "percent:1", "Engagme >1 (HV)": "percent:1", "Engagme >1 (HQ)": "percent:1", "EngagMe growth": "percent:1", "Sold from selection (store level)": "percent:2"}, "storage": {"targets": "okr2026_targets_v1", "actuals": "okr2026_actuals_v1", "owners": "okr2026_owners_v1", "soldChoice": "okr2026_sold_selection_choice_v1"}};
+
+    let selectedMonths = new Set(CFG.monthKeys);
+    let selectedMainLeader = null;
+    let selectedLeader = null;
+    let targets = {};  /* user overrides only — defaults in CFG.defaultTargets */
+    let actualOverrides = {};
+    let owners = {};
+    let storageOk = true;
+    let saveTimer = null;
+    let activeTargetInput = null;
+
+    function loadJson(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw) return JSON.parse(raw);
+      } catch (e) { storageOk = false; }
+      return fallback;
+    }
+
+    function persistJson(key, obj, memKey) {
+      try {
+        localStorage.setItem(key, JSON.stringify(obj));
+        storageOk = true;
+      } catch (e) {
+        storageOk = false;
+        window[memKey] = { ...obj };
+      }
+    }
+
+    let soldSelectionChoice = loadJson(CFG.storage.soldChoice, null);
+
+    function resolveSoldVariantMetric() {
+      if (!soldSelectionChoice || !CFG.soldSelectionVariants[soldSelectionChoice]) return null;
+      return CFG.soldSelectionVariants[soldSelectionChoice].metricName;
+    }
+
+    function buildMainMetricsList() {
+      const base = CFG.mainMetrics || CFG.baseMetrics || CFG.metrics;
+      const promoted = CFG.promotedSoldSelectionName;
+      if (!resolveSoldVariantMetric()) return base.slice();
+      if (base.includes(promoted)) return base.slice();
+      const after = CFG.soldSelectionInsertAfter || "KVI & Promo WA%";
+      const idx = base.indexOf(after);
+      const out = base.slice();
+      out.splice(idx >= 0 ? idx + 1 : out.length, 0, promoted);
+      return out;
+    }
+
+    function buildLeaderMetricsList() {
+      const base = (CFG.leaderMetrics || []).slice();
+      const promoted = CFG.promotedSoldSelectionName;
+      if (!resolveSoldVariantMetric()) return base;
+      if (base.includes(promoted)) return base;
+      const after = CFG.soldSelectionInsertAfterLeader || "Area Product Selection";
+      const idx = base.indexOf(after);
+      const out = base.slice();
+      out.splice(idx >= 0 ? idx + 1 : out.length, 0, promoted);
+      return out;
+    }
+
+    function buildEditMetricsList() {
+      const main = buildMainMetricsList();
+      const leader = buildLeaderMetricsList();
+      const review = CFG.reviewMetrics || [];
+      const seen = new Set();
+      const out = [];
+      [...main, ...leader, ...review].forEach(m => {
+        if (!seen.has(m)) { seen.add(m); out.push(m); }
+      });
+      return out;
+    }
+
+    let mainMetricsList = buildMainMetricsList();
+    let leaderMetricsList = buildLeaderMetricsList();
+    let editMetricsList = buildEditMetricsList();
+
+    function refreshMetricsLists() {
+      mainMetricsList = buildMainMetricsList();
+      leaderMetricsList = buildLeaderMetricsList();
+      editMetricsList = buildEditMetricsList();
+    }
+
+    function remapMetricKey(metric) {
+      if (metric === CFG.promotedSoldSelectionName) {
+        const vm = resolveSoldVariantMetric();
+        if (vm) return vm;
+      }
+      return metric;
+    }
+
+    function setSoldSelectionChoice(key) {
+      soldSelectionChoice = key;
+      try {
+        localStorage.setItem(CFG.storage.soldChoice, JSON.stringify(key));
+        storageOk = true;
+      } catch (e) {
+        storageOk = false;
+        window.__okrSoldChoiceMem = key;
+      }
+      refreshMetricsLists();
+      renderMainLeaderChips();
+      renderPerformance();
+      renderLeader();
+      renderEdit();
+      renderReview();
+      updateHintBanner();
+      const toast = document.getElementById("saveToast");
+      const label = CFG.soldSelectionVariants[key]?.lookerField || key;
+      toast.textContent = `נבחר: ${label} — מוצג ב-Main KPIs וב-KPI by Leader`;
+      toast.classList.add("show");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => toast.classList.remove("show"), 2800);
+    }
+
+    function clearSoldSelectionChoice() {
+      soldSelectionChoice = null;
+      try { localStorage.removeItem(CFG.storage.soldChoice); } catch (e) { storageOk = false; }
+      refreshMetricsLists();
+      renderMainLeaderChips();
+      renderPerformance();
+      renderLeader();
+      renderEdit();
+      renderReview();
+      updateHintBanner();
+    }
+
+    targets = loadJson(CFG.storage.targets, {});
+    actualOverrides = loadJson(CFG.storage.actuals, {});
+    owners = loadJson(CFG.storage.owners, {});
+
+    function saveAll(label, refreshViews) {
+      if (refreshViews === undefined) refreshViews = true;
+      persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+      persistJson(CFG.storage.actuals, actualOverrides, "__okrActualsMem");
+      persistJson(CFG.storage.owners, owners, "__okrOwnersMem");
+      const toast = document.getElementById("saveToast");
+      toast.textContent = storageOk ? (label || "Saved") : (label || "Saved") + " (session only)";
+      toast.classList.add("show");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => toast.classList.remove("show"), 2000);
+      if (refreshViews) {
+        renderPerformance();
+        renderLeader();
+        updateHintBanner();
+      }
+    }
+
+    function persistDraft() {
+      persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+      persistJson(CFG.storage.actuals, actualOverrides, "__okrActualsMem");
+      persistJson(CFG.storage.owners, owners, "__okrOwnersMem");
+    }
+
+    function saveTargets(finalize) { saveAll("Targets saved", !!finalize); }
+    function saveActuals(finalize) { saveAll("Actuals saved", !!finalize); }
+    function saveOwners() { saveAll("Leader / Partner saved", true); }
+
+    function metricByIdx(list, idx) { return list[idx]; }
+
+    function leaderRank(leader) {
+      const order = CFG.leaderOrder || [];
+      const i = order.indexOf(leader);
+      return i >= 0 ? i : 999;
+    }
+
+    function leaderMatchesFilter(metric, filterLeader) {
+      if (!filterLeader) return true;
+      const ownerLeader = getOwner(metric).leader;
+      const groups = CFG.leaderFilterGroups || {};
+      const aliases = groups[filterLeader] || [filterLeader];
+      return aliases.includes(ownerLeader);
+    }
+
+    function allLeaderViewMetrics() {
+      const seen = new Set();
+      const out = [];
+      [...mainMetricsList, ...leaderMetricsList].forEach(m => {
+        if (!seen.has(m)) { seen.add(m); out.push(m); }
+      });
+      return out;
+    }
+
+    function filteredMainMetrics() {
+      let list = mainMetricsList.slice();
+      if (selectedMainLeader) {
+        list = list.filter(m => leaderMatchesFilter(m, selectedMainLeader));
+      }
+      return list;
+    }
+
+    function filteredLeaderMetrics() {
+      let list = allLeaderViewMetrics().slice();
+      list.sort((a, b) => {
+        const la = getOwner(a).leader;
+        const lb = getOwner(b).leader;
+        const ra = leaderRank(groupsMatchRank(la));
+        const rb = leaderRank(groupsMatchRank(lb));
+        if (ra !== rb) return ra - rb;
+        const ia = OKR_INDEX(a);
+        const ib = OKR_INDEX(b);
+        return ia - ib;
+      });
+      if (selectedLeader) {
+        list = list.filter(m => leaderMatchesFilter(m, selectedLeader));
+      }
+      return list;
+    }
+
+    function groupsMatchRank(leader) {
+      const groups = CFG.leaderFilterGroups || {};
+      for (const [chip, aliases] of Object.entries(groups)) {
+        if (aliases.includes(leader)) return chip;
+      }
+      return leader;
+    }
+
+    const OKR_INDEX = (() => {
+      const order = CFG.baseMetrics || CFG.metrics || [];
+      const idx = {};
+      order.forEach((m, i) => { idx[m] = i; });
+      (CFG.mainMetrics || []).forEach((m, i) => { if (idx[m] === undefined) idx[m] = i; });
+      (CFG.leaderMetrics || []).forEach((m, i) => { if (idx[m] === undefined) idx[m] = 100 + i; });
+      return (m) => idx[m] !== undefined ? idx[m] : 999;
+    })();
+
+    function workflowBadge(metric) {
+      const wf = (CFG.metricWorkflow || {})[metric] || "auto";
+      const map = {
+        manual: ["Manual", "wf-manual"],
+        pending_send: ["אשלח אליך", "wf-pending_send"],
+        cancelled: ["Cancelled", "wf-cancelled"],
+        pending_impl: ["בהמשך", "wf-pending_impl"],
+        yearly: ["Yearly", "wf-yearly"],
+        auto: ["", ""],
+      };
+      const [label, cls] = map[wf] || ["", ""];
+      if (!label) return "";
+      return `<span class="wf-badge ${cls}">${label}</span>`;
+    }
+
+    function isWorkflowManual(metric) {
+      const wf = (CFG.metricWorkflow || {})[metric] || "auto";
+      return wf === "manual" || wf === "pending_send" || wf === "yearly";
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function escAttr(s) { return escHtml(s); }
+
+    function roundTarget(n) { return Math.round(n * 100) / 100; }
+
+    function metricFormat(metric) {
+      const key = remapMetricKey(metric);
+      return CFG.format[key] || CFG.format[metric] || "decimal:1";
+    }
+
+    function isPercentMetric(metric) { return metricFormat(metric).startsWith("percent"); }
+
+    function actualDecimals(metric) {
+      const spec = metricFormat(metric);
+      if (spec.startsWith("percent:")) return parseInt(spec.split(":")[1], 10) || 1;
+      if (spec.startsWith("decimal:")) return parseInt(spec.split(":")[1], 10) || 1;
+      return 0;
+    }
+
+    function formatDisplay(metric, value, forTarget) {
+      if (value === null || value === undefined) return "—";
+      const n = Number(value);
+      if (!Number.isFinite(n)) return "—";
+      const spec = metricFormat(metric);
+      if (spec.startsWith("percent")) {
+        const d = forTarget ? 2 : (parseInt(spec.split(":")[1], 10) || 1);
+        return n.toFixed(d) + "%";
+      }
+      if (spec === "integer") return String(Math.round(n));
+      const d = forTarget ? 2 : (parseInt(spec.split(":")[1], 10) || 1);
+      return n.toFixed(d);
+    }
+
+    function formatTargetDisplay(metric, val) {
+      if (val === undefined || val === null || val === "") return "";
+      const n = Number(val);
+      if (!Number.isFinite(n)) return "";
+      const spec = metricFormat(metric);
+      if (spec === "integer") return String(Math.round(n));
+      return n.toFixed(2);
+    }
+
+    function targetPlaceholder(metric) {
+      if (isPercentMetric(metric)) return "0.00";
+      if (metricFormat(metric) === "integer") return "0";
+      return "0.00";
+    }
+
+    function parseTargetRaw(raw) {
+      const s = String(raw).trim().replace(",", ".").replace(/^\+/, "");
+      if (s === "" || s === "-" || s === "." || s === "-.") return null;
+      const n = Number(s);
+      return Number.isFinite(n) ? roundTarget(n) : null;
+    }
+
+    function normalizeTargetValue(metric, n) {
+      if (metric === "Shrink/DDE FEE") return roundTarget(Math.abs(n));
+      return roundTarget(n);
+    }
+
+    function targetUsesPlusSign(metric) {
+      return metric === "PPM%" || metric === "Shrink/DDE FEE";
+    }
+
+    function formatTargetInput(metric, val) {
+      if (val === undefined || val === null || val === "") return "";
+      let n = Number(val);
+      if (!Number.isFinite(n)) return "";
+      if (metric === "Shrink/DDE FEE") n = Math.abs(n);
+      const spec = metricFormat(metric);
+      if (spec === "integer") return String(Math.round(n));
+      const s = n.toFixed(2);
+      return targetUsesPlusSign(metric) ? "+" + s : s;
+    }
+
+    function countTargets() {
+      let n = 0;
+      const metrics = editMetricsList.length
+        ? editMetricsList
+        : [...(CFG.mainMetrics || []), ...(CFG.leaderMetrics || [])];
+      metrics.forEach(metric => {
+        CFG.monthKeys.forEach(monthKey => {
+          if (getTarget(metric, monthKey) !== null) n++;
+        });
+      });
+      return n;
+    }
+
+    function getDefaultTarget(metric, monthKey) {
+      const d = (CFG.defaultTargets || {})[cellKey(metric, monthKey)];
+      if (d === undefined || d === null || d === "") return null;
+      return Number(d);
+    }
+
+    function updateHintBanner() {
+      const el = document.getElementById("hintBanner");
+      const n = countTargets();
+      if (n === 0) {
+        el.className = "hint-banner warn";
+        el.innerHTML = "<strong>אין יעדים.</strong> לך ל-<strong>Target</strong> להזין יעדים — או לטעון מחדש אם מחקת overrides.";
+      } else {
+        el.className = "hint-banner";
+        let soldNote = "";
+        if (soldSelectionChoice && CFG.soldSelectionVariants[soldSelectionChoice]) {
+          soldNote = ` · <strong>Sold from selection</strong>: ${escHtml(CFG.soldSelectionVariants[soldSelectionChoice].lookerField)}`;
+        }
+        const srcNote = (CFG.defaultTargets && Object.keys(CFG.defaultTargets).length)
+          ? " · יעדים מגיליון OKR (ניתן לעריכה ב-Target)"
+          : "";
+        el.innerHTML = `<strong>${n} target(s).</strong> ירוק = עמד ביעד · אדום = פספס · יעד מתחת לביצוע.${srcNote}${soldNote}`;
+      }
+    }
+
+    function cellKey(metric, monthKey) { return metric + "|" + monthKey; }
+
+    function getOwner(metric) {
+      const key = remapMetricKey(metric);
+      const d = CFG.defaultOwners[key] || CFG.defaultOwners[metric] || { leader: "", partner: "" };
+      const o = owners[metric] || owners[key] || {};
+      return {
+        leader: o.leader !== undefined ? o.leader : d.leader,
+        partner: o.partner !== undefined ? o.partner : d.partner,
+      };
+    }
+
+    function setOwner(idx, field, value) {
+      const metric = metricByIdx(editMetricsList, idx);
+      if (!owners[metric]) owners[metric] = {};
+      owners[metric][field] = value;
+      saveOwners();
+    }
+
+    function getSnowflakeActual(metric, idx) {
+      const key = remapMetricKey(metric);
+      const row = CFG.actuals[key];
+      if (!row || row[idx] === null || row[idx] === undefined) return null;
+      return Number(row[idx]);
+    }
+
+    function getActual(metric, idx) {
+      const monthKey = CFG.monthKeys[idx];
+      const k = cellKey(metric, monthKey);
+      if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "")
+        return Number(actualOverrides[k]);
+      return getSnowflakeActual(metric, idx);
+    }
+
+    function getActualOverride(metric, monthKey) {
+      const k = cellKey(metric, monthKey);
+      return actualOverrides[k];
+    }
+
+    function setActualIdx(idx, monthKey, raw, finalize) {
+      const metric = metricByIdx(editMetricsList, idx);
+      const k = cellKey(metric, monthKey);
+      const trimmed = String(raw).trim();
+      if (trimmed === "") { delete actualOverrides[k]; }
+      else {
+        const n = parseTargetRaw(trimmed);
+        if (n === null) { if (!finalize) return; return; }
+        actualOverrides[k] = n;
+      }
+      if (finalize) saveActuals(true);
+      else persistDraft();
+    }
+
+    function finalizeActualInput(inp) {
+      const idx = Number(inp.dataset.idx);
+      const metric = metricByIdx(editMetricsList, idx);
+      const n = parseTargetRaw(inp.value);
+      if (n !== null) inp.value = formatTargetDisplay(metric, n);
+      setActualIdx(idx, inp.dataset.month, inp.value, true);
+    }
+
+    function isManualMetric(metric) {
+      if (isWorkflowManual(metric)) return true;
+      const ds = CFG.dataSource[metric];
+      return ds === "manual" || ds === "user";
+    }
+
+    function getTarget(metric, monthKey) {
+      const k = cellKey(metric, monthKey);
+      if (Object.prototype.hasOwnProperty.call(targets, k)) {
+        const v = targets[k];
+        if (v === null || v === "") return null;
+        return Number(v);
+      }
+      return getDefaultTarget(metric, monthKey);
+    }
+
+    function setTargetIdx(idx, monthKey, raw, finalize) {
+      const metric = metricByIdx(editMetricsList, idx);
+      const k = cellKey(metric, monthKey);
+      const trimmed = String(raw).trim();
+      if (trimmed === "") {
+        if (getDefaultTarget(metric, monthKey) !== null) targets[k] = null;
+        else delete targets[k];
+      } else {
+        const n = parseTargetRaw(trimmed);
+        if (n === null) { if (!finalize) return; return; }
+        targets[k] = normalizeTargetValue(metric, n);
+      }
+      if (finalize) saveTargets(true);
+      else persistDraft();
+    }
+
+    function finalizeTargetInput(inp) {
+      const idx = Number(inp.dataset.idx);
+      const metric = metricByIdx(editMetricsList, idx);
+      const n = parseTargetRaw(inp.value);
+      if (n !== null) inp.value = formatTargetInput(metric, normalizeTargetValue(metric, n));
+      setTargetIdx(idx, inp.dataset.month, inp.value, true);
+    }
+
+    function direction(metric) { return CFG.direction[metric] || "higher"; }
+
+    function meetsTarget(actual, target, metric) {
+      if (actual === null || target === null) return null;
+      const dir = direction(metric);
+      const eps = 0.004;
+      if (dir === "lower") return actual <= target + eps;
+      return actual >= target - eps;
+    }
+
+    function formatTargetValue(metric, value) {
+      return formatDisplay(metric, value, true);
+    }
+
+    function formatValue(metric, value) {
+      return formatDisplay(metric, value, false);
+    }
+
+    function monthIndex(monthKey) { return CFG.monthKeys.indexOf(monthKey); }
+
+    function linkIcon() {
+      return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+    }
+
+    function sourceBadge(metric) {
+      const kind = CFG.sources[metric] || "manual_entry";
+      const map = {
+        snowflake_validated: ["Snowflake", "src-snowflake"],
+        user_provided: ["User", "src-user"],
+        manual_entry: ["Manual", "src-manual"],
+        pending_review: ["Review", "src-review"],
+        for_review: ["לבדיקה", "src-review"],
+        looker_not_approved: ["לבדיקה", "src-review"],
+      };
+      const [label, cls] = map[kind] || ["Manual", "src-manual"];
+      return `<span class="src-badge ${cls}">${label}</span>`;
+    }
+
+    function ownerCellHtml(idx, field) {
+      const metric = metricByIdx(editMetricsList, idx);
+      const val = escAttr(getOwner(metric)[field] || "");
+      return `<input type="text" class="meta-input owner-input" data-idx="${idx}" data-field="${field}" value="${val}" placeholder="—"/>`;
+    }
+
+    function valueInputHtml(idx, monthKey, kind, shown) {
+      const metric = metricByIdx(editMetricsList, idx);
+      const ph = targetPlaceholder(metric);
+      const cls = kind === "actual" ? "actual-input" : "target-input";
+      const inp = `<input type="text" inputmode="decimal" class="${cls} value-input" data-kind="${kind}" data-idx="${idx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
+      if (isPercentMetric(metric)) {
+        return `<span class="target-wrap percent">${inp}<span class="target-suffix">%</span></span>`;
+      }
+      return inp;
+    }
+
+    function promotedMetricCellHtml() {
+      const variant = CFG.soldSelectionVariants[soldSelectionChoice];
+      const metric = CFG.promotedSoldSelectionName;
+      const lk = CFG.looker[variant.metricName] || {};
+      let link = "";
+      if (lk.url) {
+        link = `<a class="src-link" href="${escAttr(lk.url)}" target="_blank" rel="noopener">${linkIcon()} ${escHtml(lk.label || "Source")}</a>`;
+      }
+      return `<div class="metric-name">${escHtml(metric)}</div>` + link;
+    }
+
+    function editMetricCellHtml(metric) {
+      return `<div class="metric-name">${escHtml(metric)}</div>`;
+    }
+
+    function metricCellHtml(metric) {
+      if (metric === CFG.promotedSoldSelectionName && soldSelectionChoice) {
+        return promotedMetricCellHtml();
+      }
+      const lk = CFG.looker[metric] || {};
+      let link = "";
+      if (lk.url) {
+        link = `<a class="src-link" href="${escAttr(lk.url)}" target="_blank" rel="noopener">${linkIcon()} ${escHtml(lk.label || "Source")}</a>`;
+      }
+      return `<div class="metric-name">${escHtml(metric)}</div>` + link;
+    }
+
+    function renderEssiCard() {
+      const el = document.getElementById("essiSessionCard");
+      const e = CFG.essiSession;
+      if (!el || !e) return;
+      const paras = (e.quote || "").split("\n\n").map(p => `<p>${escHtml(p)}</p>`).join("");
+      el.innerHTML = `<h3>${escHtml(e.meta || "Essi")}</h3>`
+        + `<blockquote class="essi-quote">${paras}</blockquote>`
+        + `<p class="essi-meta"><a href="${escAttr(e.slackUrl)}" target="_blank" rel="noopener">פתיחת ההודעה ב-Slack</a>`
+        + ` · thread על NV session conversion</p>`
+        + `<table class="essi-sources"><thead><tr><th>מקור Looker</th><th>סטטוס</th><th>קישור</th></tr></thead><tbody>`
+        + `<tr><td><code>wolt_market_data/wolt_market_venue_conversion</code></td>`
+        + `<td>Essi ✅ — סשנים + CVR</td>`
+        + `<td><a href="${escAttr(e.venueConversionUrl)}" target="_blank" rel="noopener">Venue Conversion</a></td></tr>`
+        + `<tr><td><code>kpi_data/wolt_market_metrics</code></td>`
+        + `<td>deprecated</td>`
+        + `<td><a href="${escAttr(e.kpiDeprecatedUrl)}" target="_blank" rel="noopener">WM Metrics (ישן)</a></td></tr>`
+        + `</tbody></table>`
+        + `<p class="essi-meta"><strong>למה בלבדיקה?</strong> ${escHtml(e.svenjaNote || "")}</p>`
+        + `<p class="essi-meta">${escHtml(e.noteHe || "")}</p>`;
+    }
+
+    function renderMaintenanceCard() {
+      const el = document.getElementById("maintenanceReviewCard");
+      const m = CFG.maintenanceReview;
+      if (!el || !m) return;
+      const months = CFG.monthLabels || [];
+      const ns = m.netsuiteKils || [];
+      const ibm = m.ibmKils || [];
+      const rows = months.map((label, i) => {
+        const nsVal = ns[i];
+        const ibmVal = ibm[i];
+        let gap = "—";
+        if (nsVal !== null && nsVal !== undefined && ibmVal !== null && ibmVal !== undefined) {
+          const d = nsVal - ibmVal;
+          gap = (d > 0 ? "+" : "") + Math.round(d);
+        }
+        return `<tr><td>${escHtml(label)}</td><td>${nsVal == null ? "—" : nsVal}</td><td>${ibmVal == null ? "—" : ibmVal}</td><td>${gap}</td></tr>`;
+      }).join("");
+      el.innerHTML = `<h3 style="color:#92400e;">${escHtml(m.title || "Maintenance costs")}</h3>`
+        + `<p class="essi-meta">${escHtml(CFG.maintenanceReviewNote || m.noteHe || "")}</p>`
+        + `<p class="essi-meta"><strong>NetSuite:</strong> <code>${escHtml(m.netsuiteAccount || "87310")}</code> · `
+        + `<strong>מאי 2026:</strong> NetSuite ${m.may2026Netsuite} kILS vs IBM ${m.may2026Ibm} kILS · `
+        + `פער ≈ ${m.may2026Gap} kILS</p>`
+        + `<table class="essi-sources"><thead><tr><th>חודש</th><th>NetSuite 87310</th><th>IBM fallback</th><th>Gap</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    function renderReview() {
+      const banner = document.getElementById("reviewBanner");
+      if (banner) {
+        banner.innerHTML = (CFG.soldSelectionReviewNote
+            ? `<strong>Sold from selection:</strong> ${CFG.soldSelectionReviewNote} `
+            : "")
+          + " <strong>Looker Purchases:</strong> רק wolt_market_exploration (V ✅) — לא wolt_market_data.";
+      }
+      const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const thead = document.querySelector("#reviewTable thead");
+      const tbody = document.querySelector("#reviewTable tbody");
+      if (!thead || !tbody) return;
+      thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
+        + months.map(k => {
+          const i = monthIndex(k);
+          return `<th>${CFG.monthLabels[i]}<br><span style="font-weight:400;text-transform:none">Snowflake / Looker ref</span></th>`;
+        }).join("") + "<th class='action-col'>Action</th></tr>";
+      const metrics = CFG.reviewMetrics || [];
+      tbody.innerHTML = metrics.map(metric => {
+        const o = getOwner(metric);
+        const variantKey = Object.keys(CFG.soldSelectionVariants || {}).find(
+          k => CFG.soldSelectionVariants[k].metricName === metric
+        );
+        const isChosen = variantKey && soldSelectionChoice === variantKey;
+        const cells = months.map(monthKey => {
+          const idx = monthIndex(monthKey);
+          const actual = getActual(metric, idx);
+          const lkRef = (CFG.lookerRef && CFG.lookerRef[metric]) ? CFG.lookerRef[metric][idx] : null;
+          let gap = "";
+          if (lkRef !== null && lkRef !== undefined && actual !== null) {
+            const d = actual - lkRef;
+            let deltaTxt = formatDisplay(metric, d, false);
+            if (d > 0) deltaTxt = "+" + deltaTxt;
+            const refLabel = metric === "Maintenance costs" ? "NetSuite" : "Looker";
+            gap = `<div class="delta">Δ ${refLabel} ${deltaTxt}</div>`;
+          }
+          const lkLine = (lkRef !== null && lkRef !== undefined)
+            ? `<div class="target-val">${metric === "Maintenance costs" ? "NetSuite 87310" : "Looker"}: ${formatValue(metric, lkRef)}</div>`
+            : "";
+          return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>${lkLine}${gap}</div></td>`;
+        }).join("");
+        let action = "";
+        if (variantKey) {
+          if (isChosen) {
+            action = `<button type="button" class="btn btn-muted" data-sold-clear="1">בטל בחירה</button>`
+              + `<div class="metric-hint" style="color:#4ade80;margin-top:8px">✓ Main KPIs + KPI by Leader</div>`;
+          } else {
+            action = `<button type="button" class="btn btn-primary" data-sold-choice="${escAttr(variantKey)}">השתמש בדשבורד</button>`;
+          }
+        }
+        const rowCls = isChosen ? " class='row-selected'" : "";
+        return `<tr${rowCls}><td class="leader-col">${o.leader || "—"}</td><td class="partner-col">${o.partner || "—"}</td><td class="metric-cell">${metricCellHtml(metric)}</td>${cells}<td class="action-col">${action}</td></tr>`;
+      }).join("");
+      tbody.querySelectorAll("[data-sold-choice]").forEach(btn => {
+        btn.addEventListener("click", () => setSoldSelectionChoice(btn.dataset.soldChoice));
+      });
+      tbody.querySelectorAll("[data-sold-clear]").forEach(btn => {
+        btn.addEventListener("click", () => clearSoldSelectionChoice());
+      });
+    }
+
+    function actualInlineInputHtml(metric, mIdx, monthKey, shown) {
+      const ph = targetPlaceholder(metric);
+      return `<input type="text" inputmode="decimal" class="actual-inline-input value-input" data-kind="actual" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
+    }
+
+    function bindPerformanceActualInputs(root) {
+      root.querySelectorAll(".actual-inline-input").forEach(inp => bindValueInput(inp));
+    }
+
+    function renderPeriodChips() {
+      const el = document.getElementById("periodChips");
+      el.innerHTML = CFG.monthKeys.map((k, i) => {
+        const active = selectedMonths.has(k) ? " active" : "";
+        return `<button type="button" class="chip${active}" data-month="${k}">${CFG.monthLabels[i]}</button>`;
+      }).join("");
+      el.querySelectorAll(".chip").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const k = chip.dataset.month;
+          if (selectedMonths.has(k)) {
+            if (selectedMonths.size > 1) selectedMonths.delete(k);
+          } else selectedMonths.add(k);
+          renderPeriodChips();
+          renderPerformance();
+          renderLeader();
+          renderEdit();
+          renderReview();
+        });
+      });
+    }
+
+    function renderMetricRows(metrics, tableRootId) {
+      const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const metricIdxMap = {};
+      editMetricsList.forEach((m, i) => { metricIdxMap[m] = i; });
+      return metrics.map(metric => {
+        const o = getOwner(metric);
+        const wf = (CFG.metricWorkflow || {})[metric] || "auto";
+        const mIdx = metricIdxMap[metric];
+        const manual = isManualMetric(metric);
+        const cells = months.map(monthKey => {
+          const idx = monthIndex(monthKey);
+          const actual = getActual(metric, idx);
+          const target = getTarget(metric, monthKey);
+          const override = getActualOverride(metric, monthKey);
+          const snow = getSnowflakeActual(metric, idx);
+          const actualShown = override !== undefined
+            ? formatTargetDisplay(metric, override)
+            : (snow !== null ? formatTargetDisplay(metric, snow) : "");
+
+          if (actual === null && !manual) {
+            return `<td><div class="cell-actual no-actual">—</div></td>`;
+          }
+
+          const met = meetsTarget(actual, target, metric);
+          let cls = "cell-actual";
+          if (target === null) cls += " no-target";
+          else { cls += met ? " hit" : " miss"; cls += " has-target"; }
+
+          let actualHtml = "";
+          if (manual && mIdx !== undefined) {
+            actualHtml = actualInlineInputHtml(metric, mIdx, monthKey, actualShown);
+          } else {
+            actualHtml = `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
+          }
+
+          let targetHtml = "";
+          if (target !== null) {
+            targetHtml = `<div class="cell-target-mini"><span class="lbl">יעד</span>${formatTargetValue(metric, target)}</div>`;
+          }
+
+          let delta = "";
+          if (target !== null && actual !== null) {
+            const d = actual - target;
+            let deltaTxt = formatDisplay(metric, d, false);
+            if (d > 0) deltaTxt = "+" + deltaTxt;
+            delta = `<div class="delta">${deltaTxt} vs יעד</div>`;
+          }
+
+          return `<td><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}${delta}</div>${targetHtml}</div></td>`;
+        }).join("");
+        let rowCls = manual ? "manual-row" : "";
+        if (wf === "cancelled") rowCls = (rowCls ? rowCls + " " : "") + "row-cancelled";
+        const rowClsAttr = rowCls ? ` class="${rowCls}"` : "";
+        return `<tr${rowClsAttr} data-metric="${escAttr(metric)}"><td class="leader-col">${o.leader || "—"}</td><td class="partner-col">${o.partner || "—"}</td><td class="metric-cell">${metricCellHtml(metric)}</td>${cells}</tr>`;
+      }).join("");
+    }
+
+    function renderPerformanceTableHead(tableId) {
+      const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const thead = document.querySelector(`#${tableId} thead`);
+      if (!thead) return;
+      thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
+        + months.map(k => {
+          const i = monthIndex(k);
+          return `<th>${CFG.monthLabels[i]}<br><span style="font-weight:400;text-transform:none">ביצוע</span></th>`;
+        }).join("") + "</tr>";
+    }
+
+    function renderMainLeaderChips() {
+      const el = document.getElementById("mainLeaderChips");
+      if (!el) return;
+      const leaders = CFG.leaderOrder || [];
+      const all = mainMetricsList;
+      let html = `<button type="button" class="chip${selectedMainLeader === null ? " active" : ""}" data-main-leader="">All (${all.length})</button>`;
+      html += leaders.map(l => {
+        const count = all.filter(m => leaderMatchesFilter(m, l)).length;
+        const active = selectedMainLeader === l ? " active" : "";
+        return `<button type="button" class="chip${active}${count === 0 ? " disabled" : ""}" data-main-leader="${escAttr(l)}"${count === 0 ? " disabled" : ""}>${escHtml(l)} (${count})</button>`;
+      }).join("");
+      el.innerHTML = html;
+      el.querySelectorAll(".chip:not([disabled])").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const v = chip.dataset.mainLeader;
+          selectedMainLeader = v || null;
+          renderMainLeaderChips();
+          renderPerformance();
+        });
+      });
+    }
+
+    function renderLeaderChips() {
+      const el = document.getElementById("leaderChips");
+      if (!el) return;
+      const leaders = CFG.leaderOrder || [];
+      const all = allLeaderViewMetrics();
+      let html = `<button type="button" class="chip${selectedLeader === null ? " active" : ""}" data-leader="">All (${all.length})</button>`;
+      html += leaders.map(l => {
+        const count = all.filter(m => leaderMatchesFilter(m, l)).length;
+        const active = selectedLeader === l ? " active" : "";
+        const disabled = count === 0 ? " disabled" : "";
+        return `<button type="button" class="chip${active}${disabled}" data-leader="${escAttr(l)}"${count === 0 ? " disabled" : ""}>${escHtml(l)} (${count})</button>`;
+      }).join("");
+      el.innerHTML = html;
+      el.querySelectorAll(".chip:not([disabled])").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const v = chip.dataset.leader;
+          selectedLeader = v || null;
+          renderLeaderChips();
+          renderLeader();
+        });
+      });
+    }
+
+    function renderLeader() {
+      renderPerformanceTableHead("leaderTable");
+      const tbody = document.querySelector("#leaderTable tbody");
+      if (!tbody) return;
+      tbody.innerHTML = renderMetricRows(filteredLeaderMetrics(), "leaderTable");
+      bindPerformanceActualInputs(tbody);
+    }
+
+    function renderPerformance() {
+      renderPerformanceTableHead("performanceTable");
+      const tbody = document.querySelector("#performanceTable tbody");
+      tbody.innerHTML = renderMetricRows(filteredMainMetrics(), "performanceTable");
+      bindPerformanceActualInputs(tbody);
+    }
+
+    function bindValueInput(inp) {
+      let debounce = null;
+      inp.addEventListener("focus", () => { activeTargetInput = inp; });
+      inp.addEventListener("input", () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          const idx = Number(inp.dataset.idx);
+          if (inp.dataset.kind === "actual") setActualIdx(idx, inp.dataset.month, inp.value, false);
+          else setTargetIdx(idx, inp.dataset.month, inp.value, false);
+        }, 400);
+      });
+      inp.addEventListener("blur", () => {
+        activeTargetInput = null;
+        if (inp.dataset.kind === "actual") finalizeActualInput(inp);
+        else finalizeTargetInput(inp);
+      });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+      });
+    }
+
+    function renderEdit() {
+      const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const thead = document.querySelector("#editTable thead");
+      const tbody = document.querySelector("#editTable tbody");
+      const focused = activeTargetInput
+        ? { idx: activeTargetInput.dataset.idx, month: activeTargetInput.dataset.month, kind: activeTargetInput.dataset.kind }
+        : null;
+
+      thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
+        + months.map(k => {
+          const lbl = CFG.monthLabels[monthIndex(k)];
+          return `<th>${lbl}<span class="edit-sub">יעד</span></th>`;
+        }).join("") + "</tr>";
+
+      tbody.innerHTML = editMetricsList.map((metric, mIdx) => {
+        const rowCls = isManualMetric(metric) ? "manual-row" : "";
+        const cells = months.map(monthKey => {
+          const tgt = getTarget(metric, monthKey);
+          const tgtShown = tgt === null ? "" : formatTargetInput(metric, tgt);
+          return `<td><div class="target-only-cell">`
+            + valueInputHtml(mIdx, monthKey, "target", tgtShown)
+            + `</div></td>`;
+        }).join("");
+        return `<tr class="${rowCls}"><td class="leader-col">${ownerCellHtml(mIdx, "leader")}</td>`
+          + `<td class="partner-col">${ownerCellHtml(mIdx, "partner")}</td>`
+          + `<td class="metric-cell">${editMetricCellHtml(metric)}</td>${cells}</tr>`;
+      }).join("");
+
+      tbody.querySelectorAll(".value-input").forEach(inp => {
+        bindValueInput(inp);
+        if (focused && inp.dataset.idx === focused.idx && inp.dataset.month === focused.month && inp.dataset.kind === focused.kind) {
+          inp.focus();
+          const len = inp.value.length;
+          inp.setSelectionRange(len, len);
+        }
+      });
+      tbody.querySelectorAll(".owner-input").forEach(inp => {
+        inp.addEventListener("input", () => {
+          const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
+          if (!owners[metric]) owners[metric] = {};
+          owners[metric][inp.dataset.field] = inp.value;
+          persistDraft();
+        });
+        inp.addEventListener("blur", () => setOwner(Number(inp.dataset.idx), inp.dataset.field, inp.value.trim()));
+      });
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+        tab.classList.add("active");
+        const id = tab.dataset.tab;
+        document.getElementById("panelPerformance").classList.toggle("hidden", id !== "performance");
+        document.getElementById("panelLeader").classList.toggle("hidden", id !== "leader");
+        document.getElementById("panelEdit").classList.toggle("hidden", id !== "edit");
+        document.getElementById("panelReview").classList.toggle("hidden", id !== "review");
+        if (id === "performance") { renderMainLeaderChips(); renderPerformance(); }
+        if (id === "leader") { renderLeaderChips(); renderLeader(); }
+        if (id === "edit") renderEdit();
+        if (id === "review") renderReview();
+      });
+    });
+
+    document.getElementById("btnAllPeriods").addEventListener("click", () => {
+      selectedMonths = new Set(CFG.monthKeys);
+      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview();
+    });
+    document.getElementById("btnClearPeriods").addEventListener("click", () => {
+      selectedMonths = new Set([CFG.monthKeys[CFG.monthKeys.length - 1]]);
+      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview();
+    });
+
+    renderPeriodChips();
+    renderMainLeaderChips();
+    renderLeaderChips();
+    renderPerformance();
+    renderLeader();
+    renderEdit();
+    renderReview();
+    updateHintBanner();
+  </script>
+</body>
+</html>
