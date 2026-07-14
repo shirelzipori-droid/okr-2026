@@ -17,10 +17,6 @@ class MetricRow(TypedDict):
 MAIN_SHEET_METRICS: list[str] = [
     "Orders",
     "DDE FEE/order",
-    "Ftu Sessions",
-    "Ftu Conversion",
-    "Returning User Sessions",
-    "Returning User Conversion",
     "PPM%",
     "Shrink/DDE FEE",
     "OFL / order (ILS)",
@@ -112,8 +108,18 @@ _REVIEW_ONLY_METRICS = {
     "Sold from selection — sold_from_product_selection_perc",
 }
 
+# WM Metrics FTU/RU — unapproved source; dashboard TO DELETE tab only.
+_TO_DELETE_METRICS = {
+    "Ftu Sessions",
+    "Ftu Conversion",
+    "Returning User Sessions",
+    "Returning User Conversion",
+}
+
 LEADER_SHEET_METRICS: list[str] = [
     r["name"]
     for r in OKR_METRICS
-    if r["name"] not in MAIN_SHEET_METRICS and r["name"] not in _REVIEW_ONLY_METRICS
+    if r["name"] not in MAIN_SHEET_METRICS
+    and r["name"] not in _REVIEW_ONLY_METRICS
+    and r["name"] not in _TO_DELETE_METRICS
 ]

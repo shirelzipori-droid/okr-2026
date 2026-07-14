@@ -64,10 +64,10 @@ LOOKER: dict[str, list[float | None]] = {
 METRIC_SOURCE: dict[str, str] = {
     "Orders": "snowflake_validated",
     "DDE FEE/order": "snowflake_validated",
-    "Ftu Sessions": "snowflake_validated",
-    "Ftu Conversion": "snowflake_validated",
-    "Returning User Sessions": "snowflake_validated",
-    "Returning User Conversion": "snowflake_validated",
+    "Ftu Sessions": "to_delete",
+    "Ftu Conversion": "to_delete",
+    "Returning User Sessions": "to_delete",
+    "Returning User Conversion": "to_delete",
     "PPM%": "snowflake_validated",
     "Shrink/DDE FEE": "snowflake_validated",
     "OFL / order (ILS)": "snowflake_validated",
@@ -664,6 +664,9 @@ SESSION_METRICS: list[str] = [
     "Returning User Conversion",
 ]
 
+# Unapproved WM Metrics source — quarantined on dashboard TO DELETE tab (not Main KPIs).
+TO_DELETE_TAB_METRICS: list[str] = list(SESSION_METRICS)
+
 
 def _parse_looker_url(url: str) -> tuple[str, str]:
     """Return (model, explore) from a Looker URL."""
@@ -764,6 +767,7 @@ NON_MATCHING_METRICS = (
     + MANUAL_METRICS
     + PENDING_METRICS
     + REVIEW_TAB_METRICS
+    + TO_DELETE_TAB_METRICS
 )
 
 SQL_UE = """

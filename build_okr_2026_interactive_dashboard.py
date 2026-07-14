@@ -44,6 +44,7 @@ from okr_2026_validation import (
     REVIEW_TAB_METRICS,
     SOLD_FROM_SELECTION_PROMOTED_NAME,
     SOLD_FROM_SELECTION_VARIANTS,
+    TO_DELETE_TAB_METRICS,
     USER_VERIFIED,
     WEEKLY_OKR_METRICS,
     fetch_metrics,
@@ -62,11 +63,10 @@ DASHBOARD_SOLD_SELECTION_REVIEW_NOTE = (
     "Do not use wolt_market_data/wolt_market_purchases (not approved). "
     "Pick a variant in the dashboard after your manager meeting."
 )
-DASHBOARD_SESSION_REVIEW_NOTE = (
-    f"{ESSI_SESSION_NOTE} "
-    "Snowflake: presentation.wolt_market_metrics (country row) · "
-    "Looker approved (Essi): wolt_market_venue_conversion · "
-    "Looker benchmark (deprecated): kpi_data/wolt_market_metrics."
+DASHBOARD_TO_DELETE_NOTE = (
+    "Not for manager dashboards. Snowflake: presentation.wolt_market_metrics (kpi_data — deprecated, Essi: do not rely). "
+    "Looker link shows Venue Conversion (Essi ✅) but that explore has no FTU/Returning split. "
+    "Pending approved source from #ask-consumer-analytics."
 )
 DASHBOARD_ESSI_SVENJA_NOTE = (
     "Svenja (May 2026): Venue Conversion has no built-in FTU/Returning split — "
@@ -256,9 +256,13 @@ def _build_payload(
             sources[name] = SOURCE_LABEL.get(
                 METRIC_DATA_SOURCE.get(name, "manual"), "manual_entry"
             )
-    approved_metrics = [n for n in ALL_METRIC_NAMES if n not in REVIEW_TAB_METRICS]
+    approved_metrics = [
+        n for n in ALL_METRIC_NAMES
+        if n not in REVIEW_TAB_METRICS and n not in TO_DELETE_TAB_METRICS
+    ]
     main_metrics = [m for m in MAIN_SHEET_METRICS if m in ALL_METRIC_NAMES]
-    leader_metrics = list(LEADER_SHEET_METRICS)
+    leader_metrics = [m for m in LEADER_SHEET_METRICS if m not in TO_DELETE_TAB_METRICS]
+    to_delete_metrics = list(TO_DELETE_TAB_METRICS)
     variant_meta = {
         key: {
             "metricName": spec["metric_name"],
@@ -295,7 +299,9 @@ def _build_payload(
         "approvedLookerExplores": APPROVED_LOOKER_EXPLORES,
         "notCertifiedLookerExplores": _dashboard_not_certified_explores(),
         "reviewMetrics": list(REVIEW_TAB_METRICS),
-        "reviewNote": DASHBOARD_SESSION_REVIEW_NOTE,
+        "reviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
+        "toDeleteMetrics": to_delete_metrics,
+        "toDeleteNote": DASHBOARD_TO_DELETE_NOTE,
         "maintenanceReviewNote": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
         "maintenanceReview": DASHBOARD_MAINTENANCE_REVIEW,
         "soldSelectionReviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
@@ -569,6 +575,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       color: #fff;
       box-shadow: 0 6px 20px rgba(0, 149, 179, 0.38);
     }
+    .tab.tab-delete { color: #b91c1c; }
+    .tab.tab-delete:hover { color: #991b1b; background: #fef2f2; }
+    .tab.tab-delete.active {
+      background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(220, 38, 38, 0.35);
+    }
+    .src-to-delete { background: #fee2e2; color: #991b1b; }
     .panel {
       background: rgba(255, 255, 255, 0.92);
       backdrop-filter: blur(10px);
@@ -834,6 +848,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <button type="button" class="tab" data-tab="leader">KPI by Leader</button>
         <button type="button" class="tab" data-tab="edit">Target</button>
         <button type="button" class="tab" data-tab="review">For review</button>
+        <button type="button" class="tab tab-delete" data-tab="todelete">TO DELETE</button>
       </div>
     </div>
 
@@ -908,11 +923,27 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       </div>
     </div>
 
+    <div class="panel hidden" id="panelToDelete">
+      <div class="panel-head">
+        <h2>TO DELETE — Sessions &amp; conversion (unapproved source)</h2>
+        <div class="legend">
+          <span><i class="swatch-hit"></i> On target</span>
+          <span><i class="swatch-miss"></i> Below target</span>
+        </div>
+      </div>
+      <div class="hint-banner warn" id="toDeleteBanner"></div>
+      <div id="essiSessionCard" class="essi-card"></div>
+      <div class="table-scroll">
+        <table id="toDeleteTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
     <footer>
-      VSL includes Wolt Market DC (ISR country). Sessions in K. Jun OFL may be partial until UE recon closes.
-      FTU/Returning: presentation.wolt_market_metrics · Looker WM Metrics explore.
-      Essi (21 May 2026): session counts fine to use; double-counting affects users only, not sessions.
-      IDQ pending definition review. Open Looker links per metric to verify source.
+      VSL includes Wolt Market DC (ISR country). Jun OFL may be partial until UE recon closes.
+      Sessions/CVR quarantined on TO DELETE (deprecated WM Metrics). IDQ pending definition review.
     </footer>
   </div>
 
@@ -1055,13 +1086,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const main = buildMainMetricsList();
       const leader = buildLeaderMetricsList();
       const review = CFG.reviewMetrics || [];
+      const toDelete = CFG.toDeleteMetrics || [];
       const seen = new Set();
       const out = [];
-      [...main, ...leader, ...review].forEach(m => {
+      [...main, ...leader, ...review, ...toDelete].forEach(m => {
         if (!seen.has(m)) { seen.add(m); out.push(m); }
       });
       return out;
     }
+
+    let toDeleteMetricsList = (CFG.toDeleteMetrics || []).slice();
 
     let mainMetricsList = buildMainMetricsList();
     let leaderMetricsList = buildLeaderMetricsList();
@@ -1490,6 +1524,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         pending_review: ["Review", "src-review"],
         for_review: ["For review", "src-review"],
         looker_not_approved: ["For review", "src-review"],
+        to_delete: ["TO DELETE", "src-to-delete"],
       };
       const [label, cls] = map[kind] || ["Manual", "src-manual"];
       return `<span class="src-badge ${cls}">${label}</span>`;
@@ -1557,8 +1592,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         + `<td>deprecated</td>`
         + `<td><a href="${escAttr(e.kpiDeprecatedUrl)}" target="_blank" rel="noopener">WM Metrics (legacy)</a></td></tr>`
         + `</tbody></table>`
-        + `<p class="essi-meta"><strong>Why in For review?</strong> ${escHtml(e.svenjaNote || "")}</p>`
+        + `<p class="essi-meta"><strong>Why TO DELETE?</strong> ${escHtml(e.svenjaNote || "")}</p>`
         + `<p class="essi-meta">${escHtml(e.note || e.noteHe || "")}</p>`;
+    }
+
+    function renderToDelete() {
+      const banner = document.getElementById("toDeleteBanner");
+      if (banner) {
+        banner.innerHTML = `<strong>Quarantined.</strong> ${escHtml(CFG.toDeleteNote || "")}`;
+      }
+      renderEssiCard();
+      const metrics = toDeleteMetricsList;
+      renderPerformanceTableHead("toDeleteTable", metrics);
+      const tbody = document.querySelector("#toDeleteTable tbody");
+      if (!tbody) return;
+      tbody.innerHTML = renderMetricRows(metrics, "toDeleteTable");
+      bindPerformanceActualInputs(tbody);
+      bindWeeklyToggles(tbody);
     }
 
     function renderMaintenanceCard() {
@@ -1925,20 +1975,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         document.getElementById("panelLeader").classList.toggle("hidden", id !== "leader");
         document.getElementById("panelEdit").classList.toggle("hidden", id !== "edit");
         document.getElementById("panelReview").classList.toggle("hidden", id !== "review");
+        document.getElementById("panelToDelete").classList.toggle("hidden", id !== "todelete");
         if (id === "performance") { renderMainLeaderChips(); renderPerformance(); }
         if (id === "leader") { renderLeaderChips(); renderLeader(); }
         if (id === "edit") renderEdit();
         if (id === "review") renderReview();
+        if (id === "todelete") renderToDelete();
       });
     });
 
     document.getElementById("btnAllPeriods").addEventListener("click", () => {
       selectedMonths = new Set(CFG.monthKeys);
-      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview();
+      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview(); renderToDelete();
     });
     document.getElementById("btnClearPeriods").addEventListener("click", () => {
       selectedMonths = new Set([CFG.monthKeys[CFG.monthKeys.length - 1]]);
-      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview();
+      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview(); renderToDelete();
     });
 
     renderPeriodChips();
@@ -1948,6 +2000,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     renderLeader();
     renderEdit();
     renderReview();
+    renderToDelete();
     updateHintBanner();
   </script>
 </body>
