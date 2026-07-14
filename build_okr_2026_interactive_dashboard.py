@@ -40,6 +40,7 @@ from okr_2026_validation import (
     MAINTENANCE_REVIEW_PAYLOAD,
     METRIC_SOURCE,
     NETSUITE_87310_KILS,
+    CLIENT_GROWTH_REVIEW_METRICS,
     REVIEW_TAB_METRICS,
     SOLD_FROM_SELECTION_PROMOTED_NAME,
     SOLD_FROM_SELECTION_VARIANTS,
@@ -104,6 +105,15 @@ STORAGE_TARGETS = "okr2026_targets_v1"
 STORAGE_ACTUALS = "okr2026_actuals_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
+STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
+
+# For review → Main KPIs insert order when user clicks "Use in dashboard".
+REVIEW_PROMOTION_MAIN: list[list[str]] = [
+    ["FTU", "DDE FEE/order"],
+    ["FTU Conversion", "FTU"],
+    ["Returning Clients", "FTU Conversion"],
+    ["Returning Client Conversion", "Returning Clients"],
+]
 
 SOURCE_LABEL: dict[str, str] = {
     "snowflake": "snowflake_validated",
@@ -282,6 +292,7 @@ def _build_payload(
         "soldSelectionInsertAfterLeader": "Area Product Selection",
         "approvedLookerExplores": APPROVED_LOOKER_EXPLORES,
         "notCertifiedLookerExplores": _dashboard_not_certified_explores(),
+        "reviewPromotionMain": REVIEW_PROMOTION_MAIN,
         "reviewMetrics": list(REVIEW_TAB_METRICS),
         "reviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
         "clientGrowthReviewNote": DASHBOARD_CLIENT_GROWTH_REVIEW_NOTE,
@@ -312,6 +323,7 @@ def _build_payload(
             "actuals": STORAGE_ACTUALS,
             "owners": STORAGE_OWNERS,
             "soldChoice": STORAGE_SOLD_CHOICE,
+            "promotedReview": STORAGE_PROMOTED_REVIEW,
         },
         "weeklyMetrics": list(WEEKLY_OKR_METRICS),
         "weeklyReviewMetrics": list(WEEKLY_REVIEW_METRICS),
@@ -1023,44 +1035,71 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     let soldSelectionChoice = loadJson(CFG.storage.soldChoice, null);
+    let promotedReviewMetrics = loadJson(CFG.storage.promotedReview, []);
+
+    function syncPromotedFromSoldChoice() {
+      const vm = resolveSoldVariantMetric();
+      if (vm && !promotedReviewMetrics.includes(vm)) {
+        promotedReviewMetrics.push(vm);
+        persistJson(CFG.storage.promotedReview, promotedReviewMetrics, "__okrPromotedReviewMem");
+      }
+    }
+    syncPromotedFromSoldChoice();
 
     function resolveSoldVariantMetric() {
       if (!soldSelectionChoice || !CFG.soldSelectionVariants[soldSelectionChoice]) return null;
       return CFG.soldSelectionVariants[soldSelectionChoice].metricName;
     }
 
+    function isReviewPromoted(metric, variantKey) {
+      if (variantKey) {
+        return soldSelectionChoice === variantKey && promotedReviewMetrics.includes(metric);
+      }
+      return promotedReviewMetrics.includes(metric);
+    }
+
+    function insertMetricAfter(list, metric, after) {
+      if (list.includes(metric)) return list.slice();
+      const out = list.slice();
+      const idx = out.indexOf(after);
+      out.splice(idx >= 0 ? idx + 1 : out.length, 0, metric);
+      return out;
+    }
+
     function buildMainMetricsList() {
-      const base = CFG.mainMetrics || CFG.baseMetrics || CFG.metrics;
-      const promoted = CFG.promotedSoldSelectionName;
-      if (!resolveSoldVariantMetric()) return base.slice();
-      if (base.includes(promoted)) return base.slice();
-      const after = CFG.soldSelectionInsertAfter || "KVI & Promo WA%";
-      const idx = base.indexOf(after);
-      const out = base.slice();
-      out.splice(idx >= 0 ? idx + 1 : out.length, 0, promoted);
+      let out = (CFG.mainMetrics || CFG.baseMetrics || CFG.metrics || []).slice();
+      for (const row of (CFG.reviewPromotionMain || [])) {
+        const metric = row[0];
+        const after = row[1];
+        if (promotedReviewMetrics.includes(metric)) {
+          out = insertMetricAfter(out, metric, after);
+        }
+      }
+      const soldDisplay = CFG.promotedSoldSelectionName;
+      const vm = resolveSoldVariantMetric();
+      if (vm && promotedReviewMetrics.includes(vm) && !out.includes(soldDisplay)) {
+        out = insertMetricAfter(out, soldDisplay, CFG.soldSelectionInsertAfter || "KVI & Promo WA%");
+      }
       return out;
     }
 
     function buildLeaderMetricsList() {
-      const base = (CFG.leaderMetrics || []).slice();
-      const promoted = CFG.promotedSoldSelectionName;
-      if (!resolveSoldVariantMetric()) return base;
-      if (base.includes(promoted)) return base;
-      const after = CFG.soldSelectionInsertAfterLeader || "Area Product Selection";
-      const idx = base.indexOf(after);
-      const out = base.slice();
-      out.splice(idx >= 0 ? idx + 1 : out.length, 0, promoted);
+      let out = (CFG.leaderMetrics || []).slice();
+      const soldDisplay = CFG.promotedSoldSelectionName;
+      const vm = resolveSoldVariantMetric();
+      if (vm && promotedReviewMetrics.includes(vm) && !out.includes(soldDisplay)) {
+        out = insertMetricAfter(out, soldDisplay, CFG.soldSelectionInsertAfterLeader || "Area Product Selection");
+      }
       return out;
     }
 
     function buildEditMetricsList() {
       const main = buildMainMetricsList();
       const leader = buildLeaderMetricsList();
-      const review = CFG.reviewMetrics || [];
       const toDelete = CFG.toDeleteMetrics || [];
       const seen = new Set();
       const out = [];
-      [...main, ...leader, ...review, ...toDelete].forEach(m => {
+      [...main, ...leader, ...toDelete].forEach(m => {
         if (!seen.has(m)) { seen.add(m); out.push(m); }
       });
       return out;
@@ -1086,15 +1125,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metric;
     }
 
-    function setSoldSelectionChoice(key) {
-      soldSelectionChoice = key;
-      try {
-        localStorage.setItem(CFG.storage.soldChoice, JSON.stringify(key));
-        storageOk = true;
-      } catch (e) {
-        storageOk = false;
-        window.__okrSoldChoiceMem = key;
-      }
+    function refreshViewsAfterPromotion(toastMsg) {
       refreshMetricsLists();
       renderMainLeaderChips();
       renderPerformance();
@@ -1102,24 +1133,47 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       renderEdit();
       renderReview();
       updateHintBanner();
-      const toast = document.getElementById("saveToast");
-      const label = CFG.soldSelectionVariants[key]?.lookerField || key;
-      toast.textContent = `Selected: ${label} — shown in Main KPIs and KPI by Leader`;
-      toast.classList.add("show");
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => toast.classList.remove("show"), 2800);
+      if (toastMsg) {
+        const toast = document.getElementById("saveToast");
+        toast.textContent = toastMsg;
+        toast.classList.add("show");
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => toast.classList.remove("show"), 2800);
+      }
+    }
+
+    function promoteReviewMetric(metric, variantKey) {
+      if (variantKey) {
+        soldSelectionChoice = variantKey;
+        persistJson(CFG.storage.soldChoice, soldSelectionChoice, "__okrSoldChoiceMem");
+      }
+      if (!promotedReviewMetrics.includes(metric)) {
+        promotedReviewMetrics.push(metric);
+        persistJson(CFG.storage.promotedReview, promotedReviewMetrics, "__okrPromotedReviewMem");
+      }
+      const onLeader = variantKey ? "Main KPIs, KPI by Leader & Target" : "Main KPIs & Target";
+      refreshViewsAfterPromotion(`Added: ${metric} — ${onLeader}`);
+    }
+
+    function clearReviewPromotion(metric, variantKey) {
+      promotedReviewMetrics = promotedReviewMetrics.filter(m => m !== metric);
+      persistJson(CFG.storage.promotedReview, promotedReviewMetrics, "__okrPromotedReviewMem");
+      if (variantKey && soldSelectionChoice === variantKey) {
+        soldSelectionChoice = null;
+        try { localStorage.removeItem(CFG.storage.soldChoice); } catch (e) { storageOk = false; }
+      }
+      refreshViewsAfterPromotion(null);
+    }
+
+    function setSoldSelectionChoice(key) {
+      const spec = CFG.soldSelectionVariants[key];
+      if (!spec) return;
+      promoteReviewMetric(spec.metricName, key);
     }
 
     function clearSoldSelectionChoice() {
-      soldSelectionChoice = null;
-      try { localStorage.removeItem(CFG.storage.soldChoice); } catch (e) { storageOk = false; }
-      refreshMetricsLists();
-      renderMainLeaderChips();
-      renderPerformance();
-      renderLeader();
-      renderEdit();
-      renderReview();
-      updateHintBanner();
+      const spec = soldSelectionChoice && CFG.soldSelectionVariants[soldSelectionChoice];
+      if (spec) clearReviewPromotion(spec.metricName, soldSelectionChoice);
     }
 
     targets = loadJson(CFG.storage.targets, {});
@@ -1617,7 +1671,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         const variantKey = Object.keys(CFG.soldSelectionVariants || {}).find(
           k => CFG.soldSelectionVariants[k].metricName === metric
         );
-        const isChosen = variantKey && soldSelectionChoice === variantKey;
+        const isChosen = isReviewPromoted(metric, variantKey);
         const weeklyRow = isWeeklyMode(metric);
         const cells = anyWeekly
           ? weekPeriods.map(weekKey => {
@@ -1649,24 +1703,29 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>${lkLine}${gap}</div></td>`;
         }).join("");
         let action = "";
-        if (variantKey) {
-          if (isChosen) {
-            action = `<button type="button" class="btn btn-muted" data-sold-clear="1">Clear selection</button>`
-              + `<div class="metric-hint" style="color:#4ade80;margin-top:8px">✓ Main KPIs + KPI by Leader</div>`;
-          } else {
-            action = `<button type="button" class="btn btn-primary" data-sold-choice="${escAttr(variantKey)}">Use in dashboard</button>`;
-          }
+        const leaderNote = variantKey ? "Main KPIs + KPI by Leader + Target" : "Main KPIs + Target";
+        if (isChosen) {
+          action = `<button type="button" class="btn btn-muted" data-review-clear="${escAttr(metric)}"${variantKey ? ` data-sold-variant="${escAttr(variantKey)}"` : ""}>Clear selection</button>`
+            + `<div class="metric-hint" style="color:#4ade80;margin-top:8px">✓ ${leaderNote}</div>`;
+        } else {
+          action = `<button type="button" class="btn btn-primary" data-review-promote="${escAttr(metric)}"${variantKey ? ` data-sold-variant="${escAttr(variantKey)}"` : ""}>Use in dashboard</button>`;
         }
         let rowCls = isChosen ? "row-selected" : "";
         if (weeklyRow) rowCls = (rowCls ? rowCls + " " : "") + "row-weekly-mode";
         const rowClsAttr = rowCls ? ` class="${rowCls}"` : "";
         return `<tr${rowClsAttr}><td class="leader-col">${o.leader || "—"}</td><td class="partner-col">${o.partner || "—"}</td><td class="metric-cell">${metricCellHtml(metric)}</td>${cells}<td class="action-col">${action}</td></tr>`;
       }).join("");
-      tbody.querySelectorAll("[data-sold-choice]").forEach(btn => {
-        btn.addEventListener("click", () => setSoldSelectionChoice(btn.dataset.soldChoice));
+      tbody.querySelectorAll("[data-review-promote]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const variantKey = btn.dataset.soldVariant || null;
+          promoteReviewMetric(btn.dataset.reviewPromote, variantKey);
+        });
       });
-      tbody.querySelectorAll("[data-sold-clear]").forEach(btn => {
-        btn.addEventListener("click", () => clearSoldSelectionChoice());
+      tbody.querySelectorAll("[data-review-clear]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const variantKey = btn.dataset.soldVariant || null;
+          clearReviewPromotion(btn.dataset.reviewClear, variantKey);
+        });
       });
       bindWeeklyToggles(tbody);
     }

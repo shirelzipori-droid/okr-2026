@@ -25,7 +25,7 @@ Adding a metric to `REVIEW_TAB_METRICS` is **not enough**. Also add a dedicated 
 - [ ] `LOOKER_FIELD_ALIASES` + `LOOKER_LINKS`
 - [ ] Review banner note and/or dedicated review card/screen
 - [ ] **Weekly toggle** — add to `WEEKLY_REVIEW_METRICS` + Snowflake weekly SQL in `fetch_metrics_weekly`
-- [ ] **Action** column: button to promote to Main KPIs (when applicable)
+- [ ] **Action** column: **Use in dashboard** → promotes to Main KPIs (+ Target; + KPI by Leader for sold-from-selection)
 - [ ] **Not** on `MAIN_SHEET_METRICS` until user promotes
 
 ## 2. When user promotes to Main KPIs → also add to **Target**
