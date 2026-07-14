@@ -49,10 +49,10 @@ LEADER_FILTER_GROUPS: dict[str, list[str]] = {
 OKR_METRICS: list[MetricRow] = [
     {"name": "Orders", "leader": "OPS", "partner": "CAT/MKT", "source": "snowflake", "workflow": "auto"},
     {"name": "DDE FEE/order", "leader": "CAT", "partner": "MKT", "source": "snowflake", "workflow": "auto"},
-    {"name": "Ftu Sessions", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
-    {"name": "Ftu Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
-    {"name": "Returning User Sessions", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
-    {"name": "Returning User Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
+    {"name": "New Clients", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
+    {"name": "New Client Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
+    {"name": "Returning Clients", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
+    {"name": "Returning Client Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
     {"name": "PPM%", "leader": "CAT", "partner": "", "source": "snowflake", "workflow": "auto"},
     {"name": "Shrink/DDE FEE", "leader": "SC", "partner": "CAT/OPS", "source": "snowflake", "workflow": "auto"},
     {"name": "OFL / order (ILS)", "leader": "OPS", "partner": "", "source": "snowflake", "workflow": "auto"},
@@ -105,16 +105,16 @@ METRIC_WORKFLOW = {r["name"]: r["workflow"] for r in OKR_METRICS}
 
 # Sold-from-selection variants live on the review tab only; promoted name goes on main sheet.
 _REVIEW_ONLY_METRICS = {
+    "New Clients",
+    "New Client Conversion",
+    "Returning Clients",
+    "Returning Client Conversion",
     "Sold from selection — sold_from_selection_perc",
     "Sold from selection — sold_from_product_selection_perc",
 }
 
-# WM Metrics FTU/RU — unapproved source; dashboard TO DELETE tab only.
+# Legacy WM Metrics — dashboard TO DELETE tab only.
 _TO_DELETE_METRICS = {
-    "Ftu Sessions",
-    "Ftu Conversion",
-    "Returning User Sessions",
-    "Returning User Conversion",
     "Average Goods Rating",
 }
 

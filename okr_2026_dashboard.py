@@ -20,6 +20,7 @@ from okr_2026_validation import (
     ESSI_SESSION_SLACK,
     IBM_MAINTENANCE_NOTE,
     GOLDEN_SHRINK_NOTE,
+    GOLDEN_GROWTH_CLIENTS_NOTE,
     MAINTENANCE_REVIEW_NOTE,
     GOLDEN_KVI_NOTE,
     GOLDEN_POFR_NOTE,
@@ -50,10 +51,6 @@ VALIDATION_HTML = ROOT / "auto_outputs" / "okr_2026_validation.html"
 DASHBOARD_METRICS: list[str] = [
     "Orders",
     "DDE FEE/order",
-    "Ftu Sessions",
-    "Ftu Conversion",
-    "Returning User Sessions",
-    "Returning User Conversion",
     "PPM%",
     "Shrink/DDE FEE",
     "OFL / order (ILS)",
@@ -90,17 +87,17 @@ SOURCE_BADGE: dict[str, tuple[str, str]] = {
 SC_APPROVAL: dict[str, str] = {
     "Orders": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 (Ziwei)",
     "DDE FEE/order": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217",
-    "Ftu Sessions": (
-        f"✅ verified by user · {ESSI_SESSION_NOTE} · Venue Conversion (Essi ✅)"
+    "New Clients": (
+        f"✅ Golden Growth 106613 · {GOLDEN_GROWTH_CLIENTS_NOTE}"
     ),
-    "Ftu Conversion": (
-        f"✅ verified by user · {ESSI_SESSION_NOTE} · Venue Conversion (Essi ✅)"
+    "New Client Conversion": (
+        f"✅ Golden Growth 106613 · New Client Conversion (country dedup)"
     ),
-    "Returning User Sessions": (
-        f"✅ verified by user · {ESSI_SESSION_NOTE} · Venue Conversion (Essi ✅)"
+    "Returning Clients": (
+        f"✅ Golden Growth 106613 · {GOLDEN_GROWTH_CLIENTS_NOTE}"
     ),
-    "Returning User Conversion": (
-        f"✅ verified by user · {ESSI_SESSION_NOTE} · Venue Conversion (Essi ✅)"
+    "Returning Client Conversion": (
+        f"✅ Golden Growth 106613 · Returning Client Conversion (country dedup)"
     ),
     "PPM%": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 · Product Profit Margin %",
     "Shrink/DDE FEE": f"Golden SCM 106617 — Snowflake auto · {GOLDEN_SHRINK_NOTE}",
@@ -130,9 +127,9 @@ SC_APPROVAL: dict[str, str] = {
 }
 
 NOTES = [
-    "Orders, FTU & Returning sessions are in thousands (K).",
+    "Orders, New Clients & Returning Clients are in thousands (K).",
     "VSL = country ISR in MART, includes Wolt Market DC | Nir Yaffe.",
-    f"Sessions (verified): {SESSION_REVIEW_NOTE} Slack: {ESSI_SESSION_SLACK}",
+    f"New / Returning clients: {GOLDEN_GROWTH_CLIENTS_NOTE}",
     f"Shrink/DDE FEE: {GOLDEN_SHRINK_NOTE} — נמשך אוטומטית מ-Snowflake (אותה לוגיקה כמו Golden tile).",
     f"VP%: {IBM_VP_NOTE} (IBM UI amounts in €; % matches Snowflake).",
     f"Weighted Availability: {GOLDEN_WA_NOTE} (not WA/OOS Dashboard 75053).",

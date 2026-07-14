@@ -28,10 +28,10 @@ SHRINK_GOLDEN_ANCHOR: list[float] = [1.49, 1.35, 1.10, 1.34, 1.43, 1.34]
 LOOKER: dict[str, list[float | None]] = {
     "Orders": [351, 321, 328, None, None, None],
     "DDE FEE/order": [159.3, 158.7, 169.3, None, None, None],
-    "Ftu Sessions": [179, 159, 190, None, None, None],
-    "Ftu Conversion": [20.2, 18.8, 15.5, None, None, None],
-    "Returning User Sessions": [740, 708, 850, None, None, None],
-    "Returning User Conversion": [42.4, 41.4, 34.5, None, None, None],
+    "New Clients": [123, 117, 139, 140, 157, 144],
+    "New Client Conversion": [28.4, 29.2, 27.1, 24.9, 24.4, 27.4],
+    "Returning Clients": [209, 204, 213, 233, 233, 229],
+    "Returning Client Conversion": [61.2, 60.0, 55.5, 54.9, 59.9, 61.2],
     "PPM%": [36.8, 36.5, 36.9, None, None, None],
     "Shrink/DDE FEE": list(SHRINK_GOLDEN_ANCHOR),
     "OFL / order (ILS)": [14.2, 15.2, 19.1, None, None, None],
@@ -65,10 +65,10 @@ LOOKER: dict[str, list[float | None]] = {
 METRIC_SOURCE: dict[str, str] = {
     "Orders": "snowflake_validated",
     "DDE FEE/order": "snowflake_validated",
-    "Ftu Sessions": "to_delete",
-    "Ftu Conversion": "to_delete",
-    "Returning User Sessions": "to_delete",
-    "Returning User Conversion": "to_delete",
+    "New Clients": "for_review",
+    "New Client Conversion": "for_review",
+    "Returning Clients": "for_review",
+    "Returning Client Conversion": "for_review",
     "Average Goods Rating": "to_delete",
     "PPM%": "snowflake_validated",
     "Shrink/DDE FEE": "snowflake_validated",
@@ -223,9 +223,10 @@ _LOOKER_GOLDEN_GROWTH_ISR = (
 )
 # Order Frequency / Penetration / Avg Units — Golden Growth 106613 ONLY.
 # Order Frequency tile = Order Frequency (MART); NOT kpi_data Metrics explore PURCHASE_FREQUENCY.
-GOLDEN_GROWTH_NOTE = (
-    "Golden Growth 106613 — Order Frequency (MART venue metrics: purchases ÷ distinct retail users). "
-    "לא presentation.wolt_market_metrics.PURCHASE_FREQUENCY (~2.3)."
+GOLDEN_GROWTH_CLIENTS_NOTE = (
+    "Golden Growth 106613 — New Clients & Returning Clients (venue visited, country dedup), "
+    "ISR woltmarket. New/Returning Client Conversion = converted ÷ visited "
+    "(MART VENUE_CONVERSION_DEDUPLICATED, DEDUPLICATION_KEY per month)."
 )
 PENETRATION_NOTE = (
     "Penetration Rate = Active Users % of Country MAU (USER_BASE ÷ WOLT_ACTIVE_USERS, ISR country row). "
@@ -533,10 +534,6 @@ MAINTENANCE_REVIEW_PAYLOAD: dict[str, str | list[float | None]] = {
 USER_VERIFIED: frozenset[str] = frozenset({
     "Orders",
     "DDE FEE/order",
-    "Ftu Sessions",
-    "Ftu Conversion",
-    "Returning User Sessions",
-    "Returning User Conversion",
     "PPM%",
     "OFL / order (ILS)",
     "VP%",
@@ -577,10 +574,10 @@ _LOOKER_VENUE_CONVERSION_MX = (
 LOOKER_FIELD_ALIASES: dict[str, str] = {
     "Orders": "Purchases / # Orders",
     "DDE FEE/order": "Wolt Market Subtotal VAT0 / Purchase",
-    "Ftu Sessions": "Sessions — New to Venue / FTU (אלפים)",
-    "Ftu Conversion": "New to Venue Conversion (session-based)",
-    "Returning User Sessions": "Sessions — Returning / Repeat (אלפים)",
-    "Returning User Conversion": "Repeat Venue Conversion (session-based)",
+    "New Clients": "New Clients Visited (country dedup, אלפים)",
+    "New Client Conversion": "New Client Conversion (Golden Custom Fields)",
+    "Returning Clients": "Returning Clients Visited (country dedup, אלפים)",
+    "Returning Client Conversion": "Returning Client Conversion (Golden Custom Fields)",
     "PPM%": "Product Profit Margin %",
     "Shrink/DDE FEE": "Shrinkage Share of Subtotal (Golden 106617)",
     "OFL / order (ILS)": "ORDER_FULFILLMENT_LABOR_RECON / Purchase",
@@ -612,10 +609,10 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
 LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Orders": ("UE — ISR WM (Look 47217)", _LOOKER_UE_ISR),
     "DDE FEE/order": ("UE — ISR WM DDE (Look 47217)", _LOOKER_UE_ISR),
-    "Ftu Sessions": ("WM Venue Conversion — Sessions (Essi ✅)", _LOOKER_VENUE_CONVERSION),
-    "Ftu Conversion": ("WM Venue Conversion — CVR (Essi ✅)", _LOOKER_VENUE_CONVERSION),
-    "Returning User Sessions": ("WM Venue Conversion — Sessions (Essi ✅)", _LOOKER_VENUE_CONVERSION),
-    "Returning User Conversion": ("WM Venue Conversion — CVR (Essi ✅)", _LOOKER_VENUE_CONVERSION),
+    "New Clients": ("Golden Growth — New Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "New Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "Returning Clients": ("Golden Growth — Returning Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "Returning Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "PPM%": ("UE — ISR WM (Look 47217)", _LOOKER_UE_ISR),
     "Shrink/DDE FEE": ("Golden SCM — Shrink/DDE FEE (106617)", _LOOKER_GOLDEN_SCM),
     "OFL / order (ILS)": ("Wolt Market Unit Economics (Look 47217)", _LOOKER_UE_ISR),
@@ -663,8 +660,6 @@ ESSI_SESSION_PAYLOAD: dict[str, str] = {
 # Metrics on main OKR dashboard — for Looker source audit.
 OKR_DASHBOARD_METRIC_ORDER: list[str] = [
     "Orders", "DDE FEE/order",
-    "Ftu Sessions", "Ftu Conversion",
-    "Returning User Sessions", "Returning User Conversion",
     "PPM%", "Shrink/DDE FEE",
     "OFL / order (ILS)", "VP%", "Weighted Availability", "KVI & Promo WA%",
     "POFR%", "Under 45min >", "Avg Units per Order",
@@ -672,16 +667,15 @@ OKR_DASHBOARD_METRIC_ORDER: list[str] = [
     "%Fresh Food / DDE", "IDQ", "VSL", "UP-TIME >", "% Bad Goods Rating",
 ]
 
-SESSION_METRICS: list[str] = [
-    "Ftu Sessions",
-    "Ftu Conversion",
-    "Returning User Sessions",
-    "Returning User Conversion",
+USER_GROWTH_METRICS: list[str] = [
+    "New Clients",
+    "New Client Conversion",
+    "Returning Clients",
+    "Returning Client Conversion",
 ]
 
 # Unapproved / legacy OKR metrics — quarantined on dashboard TO DELETE tab (not Main KPIs).
 TO_DELETE_TAB_METRICS: list[str] = [
-    *SESSION_METRICS,
     "Average Goods Rating",
 ]
 
@@ -777,7 +771,13 @@ PENDING_METRICS = [k for k, v in METRIC_SOURCE.items() if v == "pending_review"]
 LOOKER_NOT_APPROVED_METRICS = [
     SOLD_FROM_SELECTION_VARIANTS[k]["metric_name"] for k in SOLD_FROM_SELECTION_VARIANTS
 ]
-REVIEW_TAB_METRICS: list[str] = list(LOOKER_NOT_APPROVED_METRICS)
+CLIENT_GROWTH_REVIEW_METRICS: list[str] = [
+    "New Clients",
+    "New Client Conversion",
+    "Returning Clients",
+    "Returning Client Conversion",
+]
+REVIEW_TAB_METRICS: list[str] = CLIENT_GROWTH_REVIEW_METRICS + list(LOOKER_NOT_APPROVED_METRICS)
 
 # Legacy alias — kept for scripts that import NON_MATCHING_METRICS.
 NON_MATCHING_METRICS = (
@@ -872,6 +872,67 @@ GROUP BY 1
 ORDER BY 1
 """
 
+SQL_GOLDEN_GROWTH_CLIENT_METRICS = """
+WITH client_month AS (
+  SELECT DATE_TRUNC('month', v.METRIC_DATE)::DATE AS m,
+    v.DEDUPLICATION_KEY,
+    MAX(v.NEW_CLIENTS_VENUE_VISITED) AS new_vis,
+    MAX(v.NEW_CLIENTS_CONVERTED) AS new_conv,
+    MAX(v.RETURNING_CLIENTS_VENUE_VISITED) AS ret_vis,
+    MAX(v.RETURNING_CLIENTS_CONVERTED) AS ret_conv
+  FROM PRODUCTION.MART.VENUE_CONVERSION_DEDUPLICATED_METRICS_MONTHLY v
+  JOIN PRODUCTION.INTERMEDIATE.D_VENUES dv ON v.VENUE_ID = dv.VENUE_ID
+  WHERE dv.VENUE_COUNTRY = 'ISR'
+    AND dv.FRANCHISE_NAME = 'woltmarket'
+    AND v.METRIC_DATE >= '2026-01-01'
+    AND v.METRIC_DATE < '2026-07-01'
+  GROUP BY 1, 2
+)
+SELECT m,
+  SUM(new_vis) AS new_clients,
+  SUM(ret_vis) AS ret_clients,
+  SUM(new_conv) AS new_conv_num,
+  SUM(new_vis) AS new_conv_den,
+  SUM(ret_conv) AS ret_conv_num,
+  SUM(ret_vis) AS ret_conv_den
+FROM client_month
+GROUP BY 1
+ORDER BY m
+"""
+
+# Deprecated — user counts from presentation (FTU_WOLT_MARKET / REPEAT_CUSTOMERS).
+SQL_GOLDEN_GROWTH_FTU_USERS = """
+SELECT DATE_TRUNC('month', DATE)::DATE AS m,
+  FTU_WOLT_MARKET AS ftu_users,
+  REPEAT_CUSTOMERS AS ret_users
+FROM PRODUCTION.PRESENTATION.WOLT_MARKET_METRICS
+WHERE PERIOD = 'month'
+  AND COUNTRY = 'ISR'
+  AND AREA = 'country'
+  AND VENUE_NAME IS NULL
+  AND DATE >= '2026-01-01'
+  AND DATE < '2026-07-01'
+ORDER BY m
+"""
+
+# Deprecated — venue SUM without country dedup (overstates CVR vs Golden).
+SQL_GOLDEN_GROWTH_USER_CVR = """
+SELECT DATE_TRUNC('month', v.METRIC_DATE)::DATE AS m,
+  SUM(v.NEW_CLIENTS_CONVERTED) AS ftu_conv_num,
+  SUM(v.NEW_CLIENTS_VENUE_VISITED) AS ftu_conv_den,
+  SUM(v.RETURNING_CLIENTS_CONVERTED) AS ret_conv_num,
+  SUM(v.RETURNING_CLIENTS_VENUE_VISITED) AS ret_conv_den
+FROM PRODUCTION.MART.VENUE_CONVERSION_DEDUPLICATED_METRICS_MONTHLY v
+JOIN PRODUCTION.INTERMEDIATE.D_VENUES dv ON v.VENUE_ID = dv.VENUE_ID
+WHERE dv.VENUE_COUNTRY = 'ISR'
+  AND dv.FRANCHISE_NAME = 'woltmarket'
+  AND v.METRIC_DATE >= '2026-01-01'
+  AND v.METRIC_DATE < '2026-07-01'
+GROUP BY 1
+ORDER BY m
+"""
+
+# Deprecated — session-based WM Metrics (TO DELETE legacy only).
 SQL_WM_MONTH_VENUES = """
 SELECT DATE_TRUNC('month', DATE)::DATE AS m,
   SUM(FTU_SESSIONS) AS ftu_sessions,
@@ -1079,10 +1140,6 @@ def _month_index(d: date) -> int:
 WEEKLY_OKR_METRICS: tuple[str, ...] = (
     "Orders",
     "DDE FEE/order",
-    "Ftu Sessions",
-    "Ftu Conversion",
-    "Returning User Sessions",
-    "Returning User Conversion",
     "PPM%",
     "Shrink/DDE FEE",
     "Weighted Availability",
@@ -1149,6 +1206,33 @@ WHERE o.COUNTRY = 'ISR'
   AND o.IS_WOLT_MARKET = TRUE
   AND o.TIMESTAMP >= '{start}'
   AND o.TIMESTAMP < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+        "clients": f"""
+WITH client_week AS (
+  SELECT DATE_TRUNC('week', v.METRIC_DATE)::DATE AS wk,
+    v.DEDUPLICATION_KEY,
+    MAX(v.NEW_CLIENTS_VENUE_VISITED) AS new_vis,
+    MAX(v.NEW_CLIENTS_CONVERTED) AS new_conv,
+    MAX(v.RETURNING_CLIENTS_VENUE_VISITED) AS ret_vis,
+    MAX(v.RETURNING_CLIENTS_CONVERTED) AS ret_conv
+  FROM PRODUCTION.MART.VENUE_CONVERSION_DEDUPLICATED_METRICS_WEEKLY v
+  JOIN PRODUCTION.INTERMEDIATE.D_VENUES dv ON v.VENUE_ID = dv.VENUE_ID
+  WHERE dv.VENUE_COUNTRY = 'ISR'
+    AND dv.FRANCHISE_NAME = 'woltmarket'
+    AND v.METRIC_DATE >= '{start}'
+    AND v.METRIC_DATE < '{sql_end}'
+  GROUP BY 1, 2
+)
+SELECT wk,
+  SUM(new_vis) AS new_clients,
+  SUM(ret_vis) AS ret_clients,
+  SUM(new_conv) AS new_conv_num,
+  SUM(new_vis) AS new_conv_den,
+  SUM(ret_conv) AS ret_conv_num,
+  SUM(ret_vis) AS ret_conv_den
+FROM client_week
 GROUP BY 1
 ORDER BY 1
 """,
@@ -1231,14 +1315,6 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
                 set_weekly("DDE FEE/order", wk, _safe_div(dde_sum, orders))
                 set_weekly("PPM%", wk, 100 * _safe_div(ppm_num, wm_sub))
 
-            cur.execute(sql["sessions"])
-            for row in cur.fetchall():
-                wk, ftu_s, ftu_o, ret_s, ret_o = row
-                set_weekly("Ftu Sessions", wk, ftu_s / 1000)
-                set_weekly("Ftu Conversion", wk, 100 * _safe_div(ftu_o, ftu_s))
-                set_weekly("Returning User Sessions", wk, ret_s / 1000)
-                set_weekly("Returning User Conversion", wk, 100 * _safe_div(ret_o, ret_s))
-
             cur.execute(sql["mart"])
             for row in cur.fetchall():
                 (wk, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d) = row
@@ -1286,7 +1362,7 @@ def _safe_div(num: float | None, den: float | None) -> float | None:
 def _round_val(name: str, value: float | None) -> float | None:
     if value is None:
         return None
-    if name in ("Orders", "Ftu Sessions", "Returning User Sessions", "Area Product Selection",
+    if name in ("Orders", "New Clients", "Returning Clients", "Area Product Selection",
                 "Maintenance costs"):
         return round(value)
     if name in ("Order Frequency", "DDE FEE/order", "OFL / order (ILS)", "Avg Units per Order",
@@ -1297,7 +1373,7 @@ def _round_val(name: str, value: float | None) -> float | None:
                                                       "KVI & Promo WA%", "Penetration Rate",
                                                       "% Bad Goods Rating",
                                                       "Shrink/DDE FEE", "%Fresh Food / DDE",
-                                                      "Ftu Conversion", "Returning User Conversion",
+                                                      "New Client Conversion", "Returning Client Conversion",
                                                       "Weighted Availability",
                                                       "Sold from selection — sold_from_selection_perc",
                                                       "Sold from selection — sold_from_product_selection_perc",
@@ -1311,7 +1387,9 @@ def _round_val(name: str, value: float | None) -> float | None:
             "Shrink/DDE FEE",
             "% Bad Goods Rating",
         )
-        return round(value, 2 if name in sold_2dp else 1)
+        return round(value, 2 if name in sold_2dp or name in (
+            "New Client Conversion", "Returning Client Conversion",
+        ) else 1)
     return round(value, 1)
 
 
@@ -1484,19 +1562,17 @@ def fetch_metrics() -> tuple[
             for i, val in enumerate(maintenance_vals):
                 data["Maintenance costs"][i] = val
 
-            cur.execute(SQL_WM_MONTH_VENUES)
+            cur.execute(SQL_GOLDEN_GROWTH_CLIENT_METRICS)
             for row in cur.fetchall():
-                m, ftu_s, ftu_o, ret_s, ret_o = row
+                m, new_c, ret_c, new_cn, new_cd, ret_cn, ret_cd = row
                 i = _month_index(m)
-                data["Ftu Sessions"][i] = _round_val("Ftu Sessions", ftu_s / 1000)
-                data["Ftu Conversion"][i] = _round_val(
-                    "Ftu Conversion", 100 * _safe_div(ftu_o, ftu_s)
+                data["New Clients"][i] = _round_val("New Clients", new_c / 1000)
+                data["Returning Clients"][i] = _round_val("Returning Clients", ret_c / 1000)
+                data["New Client Conversion"][i] = _round_val(
+                    "New Client Conversion", 100 * _safe_div(new_cn, new_cd)
                 )
-                data["Returning User Sessions"][i] = _round_val(
-                    "Returning User Sessions", ret_s / 1000
-                )
-                data["Returning User Conversion"][i] = _round_val(
-                    "Returning User Conversion", 100 * _safe_div(ret_o, ret_s)
+                data["Returning Client Conversion"][i] = _round_val(
+                    "Returning Client Conversion", 100 * _safe_div(ret_cn, ret_cd)
                 )
 
             cur.execute(SQL_GOLDEN_GROWTH_ISR)

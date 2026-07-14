@@ -61,6 +61,10 @@ DASHBOARD_SOLD_SELECTION_REVIEW_NOTE = (
     "Do not use wolt_market_data/wolt_market_purchases (not approved). "
     "Pick a variant in the dashboard after your manager meeting."
 )
+DASHBOARD_CLIENT_GROWTH_REVIEW_NOTE = (
+    "New / Returning Clients & Client Conversion — Golden Growth 106613 (country dedup, ISR woltmarket). "
+    "Snowflake vs Looker ref — verify before promoting to Main KPIs."
+)
 DASHBOARD_MAINTENANCE_REVIEW = {
     **MAINTENANCE_REVIEW_PAYLOAD,
     "noteHe": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
@@ -118,8 +122,8 @@ METRIC_DIRECTION: dict[str, str] = {
 
 METRIC_HINTS: dict[str, str] = {
     "Orders": "Thousands (K)",
-    "Ftu Sessions": "Thousands (K)",
-    "Returning User Sessions": "Thousands (K)",
+    "New Clients": "Thousands (K)",
+    "Returning Clients": "Thousands (K)",
     "VSL": "ISR country incl. DC",
 }
 
@@ -127,10 +131,10 @@ METRIC_HINTS: dict[str, str] = {
 METRIC_FORMAT: dict[str, str] = {
     "Orders": "integer",
     "DDE FEE/order": "decimal:1",
-    "Ftu Sessions": "integer",
-    "Ftu Conversion": "percent:1",
-    "Returning User Sessions": "integer",
-    "Returning User Conversion": "percent:1",
+    "New Clients": "integer",
+    "New Client Conversion": "percent:2",
+    "Returning Clients": "integer",
+    "Returning Client Conversion": "percent:2",
     "PPM%": "percent:1",
     "Shrink/DDE FEE": "percent:2",
     "OFL / order (ILS)": "decimal:1",
@@ -278,6 +282,7 @@ def _build_payload(
         "notCertifiedLookerExplores": _dashboard_not_certified_explores(),
         "reviewMetrics": list(REVIEW_TAB_METRICS),
         "reviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
+        "clientGrowthReviewNote": DASHBOARD_CLIENT_GROWTH_REVIEW_NOTE,
         "toDeleteMetrics": to_delete_metrics,
         "maintenanceReviewNote": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
         "maintenanceReview": DASHBOARD_MAINTENANCE_REVIEW,
@@ -1573,7 +1578,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function renderReview() {
       const banner = document.getElementById("reviewBanner");
       if (banner) {
-        banner.innerHTML = (CFG.soldSelectionReviewNote
+        banner.innerHTML = (CFG.clientGrowthReviewNote
+            ? `<strong>Client growth:</strong> ${CFG.clientGrowthReviewNote} `
+            : "")
+          + (CFG.soldSelectionReviewNote
             ? `<strong>Sold from selection:</strong> ${CFG.soldSelectionReviewNote} `
             : "")
           + " <strong>Looker Purchases:</strong> wolt_market_exploration (V ✅) only — not wolt_market_data.";
