@@ -1,0 +1,55 @@
+---
+description: OKR dashboard — For review screen + promotion to Main KPIs and Target tab
+globs: OKR 2026/**/*
+alwaysApply: false
+---
+
+# OKR Review → Dashboard → Target workflow
+
+When adding or changing OKR metrics in the interactive dashboard (`build_okr_2026_interactive_dashboard.py`, `okr_2026_validation.py`, `okr_2026_metrics_registry.py`), follow this pipeline.
+
+## 1. Every metric on **For review** must get a review screen
+
+Adding a metric to `REVIEW_TAB_METRICS` is **not enough**. Also add a dedicated review UI block on the **For review** tab:
+
+| Pattern | Example | Required elements |
+|---------|---------|-------------------|
+| Review card | `maintenanceReviewCard` / `renderMaintenanceCard()` | Title, source note, Snowflake vs reference comparison table |
+| Review row + action | Sold from selection variants | Table row in `#reviewTable`, Looker link, **Action** button |
+| Review note | `clientGrowthReviewNote`, `soldSelectionReviewNote` | Banner text explaining source and what to verify |
+
+**Checklist when adding a review metric:**
+- [ ] `REVIEW_TAB_METRICS` + `_REVIEW_ONLY_METRICS` in registry
+- [ ] `METRIC_SOURCE` = `for_review` or `looker_not_approved`
+- [ ] `LOOKER` benchmark row(s) for Snowflake comparison
+- [ ] `LOOKER_FIELD_ALIASES` + `LOOKER_LINKS`
+- [ ] Review banner note and/or dedicated review card/screen
+- [ ] **Action** column: button to promote to Main KPIs (when applicable)
+- [ ] **Not** on `MAIN_SHEET_METRICS` until user promotes
+
+## 2. When user promotes to Main KPIs → also add to **Target**
+
+Promotion = metric appears on **Main KPIs** and **KPI by Leader** (not only For review).
+
+When promoted, the metric must also appear on the **Target** tab with editable monthly goals:
+
+- [ ] Add default targets in `okr_2026_default_targets.py` (`OKR_2026_TARGET_BY_METRIC`)
+- [ ] Ensure metric is in `buildEditMetricsList()` / Target render list **after promotion** (see `buildMainMetricsList` + `setSoldSelectionChoice` pattern)
+- [ ] Format hints in `build_okr_2026_interactive_dashboard.py` (`FORMAT_HINTS`, `_default_format`)
+- [ ] Rebuild: `python build_okr_2026_interactive_dashboard.py`
+- [ ] **Commit and push to GitHub** (`docs/index.html` + source files) — always, without waiting for user to ask
+
+**Do not** leave review-only metrics on Main KPIs by default. User promotes explicitly from For review.
+
+## Reference implementation
+
+- **Sold from selection:** review variants → "Use in dashboard" → `promotedSoldSelectionName` on Main + Leader + Target
+- **Client growth (pending promotion UI):** review table rows only until promotion buttons/card are wired like sold-from-selection
+
+## Files to touch (typical)
+
+1. `okr_2026_validation.py` — SQL, `REVIEW_TAB_METRICS`, `LOOKER`, sources
+2. `okr_2026_metrics_registry.py` — `_REVIEW_ONLY_METRICS`, `MAIN_SHEET_METRICS`
+3. `okr_2026_default_targets.py` — targets when promoted
+4. `build_okr_2026_interactive_dashboard.py` — review screen, promotion JS, Target list
+5. `docs/index.html` — rebuild + deploy

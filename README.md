@@ -12,7 +12,15 @@ Local file:
 
 `auto_outputs/okr_2026_interactive_dashboard.html`
 
-Tabs: **Main KPIs**, **KPI by Leader**, **Target (יעדים)**, **לבדיקה**.
+Tabs: **Main KPIs**, **KPI by Leader**, **Target (יעדים)**, **For review**, **TO DELETE**.
+
+## Metric workflow (Review → Dashboard → Target)
+
+1. **For review** — new metrics start here with a dedicated review screen (card/table + Snowflake vs Looker + source note).
+2. **Main KPIs** — only after you promote a metric from For review (e.g. “Use in dashboard”).
+3. **Target** — when a metric is on Main KPIs, it must also appear on the Target tab with monthly goals (`okr_2026_default_targets.py`).
+
+See `.cursor/rules/okr-review-promotion-workflow.mdc` for the full checklist.
 
 Target overrides and manual actuals are saved in the browser (`localStorage`).
 
@@ -27,6 +35,8 @@ python build_okr_2026_interactive_dashboard.py --skip-fetch
 ```
 
 Use `--skip-fetch` on the last two commands when reusing cached Snowflake data from `auto_outputs/okr_2026_validation.html`.
+
+After rebuild, **commit and push to GitHub** so https://shirelzipori-droid.github.io/okr-2026/ updates (allow 1–2 min, then hard refresh).
 
 ## Snowflake auth
 
