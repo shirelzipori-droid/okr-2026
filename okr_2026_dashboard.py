@@ -87,11 +87,11 @@ SOURCE_BADGE: dict[str, tuple[str, str]] = {
 SC_APPROVAL: dict[str, str] = {
     "Orders": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 (Ziwei)",
     "DDE FEE/order": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217",
-    "New Clients": (
+    "FTU": (
         f"✅ Golden Growth 106613 · {GOLDEN_GROWTH_CLIENTS_NOTE}"
     ),
-    "New Client Conversion": (
-        f"✅ Golden Growth 106613 · New Client Conversion (country dedup)"
+    "FTU Conversion": (
+        f"✅ Golden Growth 106613 · FTU Conversion / New Client Conversion (country dedup)"
     ),
     "Returning Clients": (
         f"✅ Golden Growth 106613 · {GOLDEN_GROWTH_CLIENTS_NOTE}"
@@ -127,7 +127,7 @@ SC_APPROVAL: dict[str, str] = {
 }
 
 NOTES = [
-    "Orders, New Clients & Returning Clients are in thousands (K).",
+    "Orders, FTU & Returning Clients are in thousands (K).",
     "VSL = country ISR in MART, includes Wolt Market DC | Nir Yaffe.",
     f"New / Returning clients: {GOLDEN_GROWTH_CLIENTS_NOTE}",
     f"Shrink/DDE FEE: {GOLDEN_SHRINK_NOTE} — נמשך אוטומטית מ-Snowflake (אותה לוגיקה כמו Golden tile).",

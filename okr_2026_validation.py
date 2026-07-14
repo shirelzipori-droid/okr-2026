@@ -28,8 +28,8 @@ SHRINK_GOLDEN_ANCHOR: list[float] = [1.49, 1.35, 1.10, 1.34, 1.43, 1.34]
 LOOKER: dict[str, list[float | None]] = {
     "Orders": [351, 321, 328, None, None, None],
     "DDE FEE/order": [159.3, 158.7, 169.3, None, None, None],
-    "New Clients": [123, 117, 139, 140, 157, 144],
-    "New Client Conversion": [28.4, 29.2, 27.1, 24.9, 24.4, 27.4],
+    "FTU": [123, 117, 139, 140, 157, 144],
+    "FTU Conversion": [28.4, 29.2, 27.1, 24.9, 24.4, 27.4],
     "Returning Clients": [209, 204, 213, 233, 233, 229],
     "Returning Client Conversion": [61.2, 60.0, 55.5, 54.9, 59.9, 61.2],
     "PPM%": [36.8, 36.5, 36.9, None, None, None],
@@ -65,8 +65,8 @@ LOOKER: dict[str, list[float | None]] = {
 METRIC_SOURCE: dict[str, str] = {
     "Orders": "snowflake_validated",
     "DDE FEE/order": "snowflake_validated",
-    "New Clients": "for_review",
-    "New Client Conversion": "for_review",
+    "FTU": "for_review",
+    "FTU Conversion": "for_review",
     "Returning Clients": "for_review",
     "Returning Client Conversion": "for_review",
     "Average Goods Rating": "to_delete",
@@ -224,9 +224,9 @@ _LOOKER_GOLDEN_GROWTH_ISR = (
 # Order Frequency / Penetration / Avg Units — Golden Growth 106613 ONLY.
 # Order Frequency tile = Order Frequency (MART); NOT kpi_data Metrics explore PURCHASE_FREQUENCY.
 GOLDEN_GROWTH_CLIENTS_NOTE = (
-    "Golden Growth 106613 — New Clients & Returning Clients (venue visited, country dedup), "
-    "ISR woltmarket. New/Returning Client Conversion = converted ÷ visited "
-    "(MART VENUE_CONVERSION_DEDUPLICATED, DEDUPLICATION_KEY per month)."
+    "Golden Growth 106613 — FTU & Returning Clients (venue visited, country dedup), "
+    "ISR woltmarket. FTU / Returning Client Conversion = converted ÷ visited "
+    "(MART VENUE_CONVERSION_DEDUPLICATED). Month + weekly (last 6 completed weeks)."
 )
 PENETRATION_NOTE = (
     "Penetration Rate = Active Users % of Country MAU (USER_BASE ÷ WOLT_ACTIVE_USERS, ISR country row). "
@@ -574,10 +574,10 @@ _LOOKER_VENUE_CONVERSION_MX = (
 LOOKER_FIELD_ALIASES: dict[str, str] = {
     "Orders": "Purchases / # Orders",
     "DDE FEE/order": "Wolt Market Subtotal VAT0 / Purchase",
-    "New Clients": "New Clients Visited (country dedup, אלפים)",
-    "New Client Conversion": "New Client Conversion (Golden Custom Fields)",
-    "Returning Clients": "Returning Clients Visited (country dedup, אלפים)",
-    "Returning Client Conversion": "Returning Client Conversion (Golden Custom Fields)",
+    "FTU": "FTU Visited (country dedup, אלפים) · month + weekly",
+    "FTU Conversion": "FTU Conversion / New Client Conversion (Golden) · month + weekly",
+    "Returning Clients": "Returning Clients Visited (country dedup, אלפים) · month + weekly",
+    "Returning Client Conversion": "Returning Client Conversion (Golden) · month + weekly",
     "PPM%": "Product Profit Margin %",
     "Shrink/DDE FEE": "Shrinkage Share of Subtotal (Golden 106617)",
     "OFL / order (ILS)": "ORDER_FULFILLMENT_LABOR_RECON / Purchase",
@@ -609,8 +609,8 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
 LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Orders": ("UE — ISR WM (Look 47217)", _LOOKER_UE_ISR),
     "DDE FEE/order": ("UE — ISR WM DDE (Look 47217)", _LOOKER_UE_ISR),
-    "New Clients": ("Golden Growth — New Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
-    "New Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "FTU": ("Golden Growth — FTU (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "FTU Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Clients": ("Golden Growth — Returning Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "PPM%": ("UE — ISR WM (Look 47217)", _LOOKER_UE_ISR),
@@ -668,8 +668,8 @@ OKR_DASHBOARD_METRIC_ORDER: list[str] = [
 ]
 
 USER_GROWTH_METRICS: list[str] = [
-    "New Clients",
-    "New Client Conversion",
+    "FTU",
+    "FTU Conversion",
     "Returning Clients",
     "Returning Client Conversion",
 ]
@@ -772,8 +772,8 @@ LOOKER_NOT_APPROVED_METRICS = [
     SOLD_FROM_SELECTION_VARIANTS[k]["metric_name"] for k in SOLD_FROM_SELECTION_VARIANTS
 ]
 CLIENT_GROWTH_REVIEW_METRICS: list[str] = [
-    "New Clients",
-    "New Client Conversion",
+    "FTU",
+    "FTU Conversion",
     "Returning Clients",
     "Returning Client Conversion",
 ]
@@ -1351,9 +1351,9 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
             cur.execute(sql["clients"])
             for row in cur.fetchall():
                 wk, new_c, ret_c, new_cn, new_cd, ret_cn, ret_cd = row
-                set_weekly("New Clients", wk, new_c / 1000)
+                set_weekly("FTU", wk, new_c / 1000)
                 set_weekly("Returning Clients", wk, ret_c / 1000)
-                set_weekly("New Client Conversion", wk, 100 * _safe_div(new_cn, new_cd))
+                set_weekly("FTU Conversion", wk, 100 * _safe_div(new_cn, new_cd))
                 set_weekly("Returning Client Conversion", wk, 100 * _safe_div(ret_cn, ret_cd))
 
             cur.execute(sql["mart"])
@@ -1417,7 +1417,7 @@ def _safe_div(num: float | None, den: float | None) -> float | None:
 def _round_val(name: str, value: float | None) -> float | None:
     if value is None:
         return None
-    if name in ("Orders", "New Clients", "Returning Clients", "Area Product Selection",
+    if name in ("Orders", "FTU", "Returning Clients", "Area Product Selection",
                 "Maintenance costs"):
         return round(value)
     if name in ("Order Frequency", "DDE FEE/order", "OFL / order (ILS)", "Avg Units per Order",
@@ -1428,7 +1428,7 @@ def _round_val(name: str, value: float | None) -> float | None:
                                                       "KVI & Promo WA%", "Penetration Rate",
                                                       "% Bad Goods Rating",
                                                       "Shrink/DDE FEE", "%Fresh Food / DDE",
-                                                      "New Client Conversion", "Returning Client Conversion",
+                                                      "FTU Conversion", "Returning Client Conversion",
                                                       "Weighted Availability",
                                                       "Sold from selection — sold_from_selection_perc",
                                                       "Sold from selection — sold_from_product_selection_perc",
@@ -1443,7 +1443,7 @@ def _round_val(name: str, value: float | None) -> float | None:
             "% Bad Goods Rating",
         )
         return round(value, 2 if name in sold_2dp or name in (
-            "New Client Conversion", "Returning Client Conversion",
+            "FTU Conversion", "Returning Client Conversion",
         ) else 1)
     return round(value, 1)
 
@@ -1621,10 +1621,10 @@ def fetch_metrics() -> tuple[
             for row in cur.fetchall():
                 m, new_c, ret_c, new_cn, new_cd, ret_cn, ret_cd = row
                 i = _month_index(m)
-                data["New Clients"][i] = _round_val("New Clients", new_c / 1000)
+                data["FTU"][i] = _round_val("FTU", new_c / 1000)
                 data["Returning Clients"][i] = _round_val("Returning Clients", ret_c / 1000)
-                data["New Client Conversion"][i] = _round_val(
-                    "New Client Conversion", 100 * _safe_div(new_cn, new_cd)
+                data["FTU Conversion"][i] = _round_val(
+                    "FTU Conversion", 100 * _safe_div(new_cn, new_cd)
                 )
                 data["Returning Client Conversion"][i] = _round_val(
                     "Returning Client Conversion", 100 * _safe_div(ret_cn, ret_cd)

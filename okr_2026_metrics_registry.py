@@ -49,8 +49,8 @@ LEADER_FILTER_GROUPS: dict[str, list[str]] = {
 OKR_METRICS: list[MetricRow] = [
     {"name": "Orders", "leader": "OPS", "partner": "CAT/MKT", "source": "snowflake", "workflow": "auto"},
     {"name": "DDE FEE/order", "leader": "CAT", "partner": "MKT", "source": "snowflake", "workflow": "auto"},
-    {"name": "New Clients", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
-    {"name": "New Client Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
+    {"name": "FTU", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
+    {"name": "FTU Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
     {"name": "Returning Clients", "leader": "MKT", "partner": "", "source": "snowflake", "workflow": "auto"},
     {"name": "Returning Client Conversion", "leader": "CAT", "partner": "SC", "source": "snowflake", "workflow": "auto"},
     {"name": "PPM%", "leader": "CAT", "partner": "", "source": "snowflake", "workflow": "auto"},
@@ -105,8 +105,8 @@ METRIC_WORKFLOW = {r["name"]: r["workflow"] for r in OKR_METRICS}
 
 # Sold-from-selection variants live on the review tab only; promoted name goes on main sheet.
 _REVIEW_ONLY_METRICS = {
-    "New Clients",
-    "New Client Conversion",
+    "FTU",
+    "FTU Conversion",
     "Returning Clients",
     "Returning Client Conversion",
     "Sold from selection — sold_from_selection_perc",

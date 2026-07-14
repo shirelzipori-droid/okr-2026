@@ -35,6 +35,7 @@ from okr_2026_validation import (
     APPROVED_LOOKER_EXPLORES,
     LOOKER,
     LOOKER_EXPLORE_NOT_CERTIFIED,
+    LOOKER_FIELD_ALIASES,
     LOOKER_LINKS,
     MAINTENANCE_REVIEW_PAYLOAD,
     METRIC_SOURCE,
@@ -63,8 +64,8 @@ DASHBOARD_SOLD_SELECTION_REVIEW_NOTE = (
     "Pick a variant in the dashboard after your manager meeting."
 )
 DASHBOARD_CLIENT_GROWTH_REVIEW_NOTE = (
-    "New / Returning Clients & Client Conversion — Golden Growth 106613 (country dedup, ISR woltmarket). "
-    "Snowflake vs Looker ref — verify before promoting to Main KPIs."
+    "FTU, FTU Conversion, Returning Clients & Returning Client Conversion — Golden Growth 106613 "
+    "(country dedup, ISR woltmarket). Month + weekly (WEEKLY toggle). Snowflake vs Looker ref."
 )
 DASHBOARD_MAINTENANCE_REVIEW = {
     **MAINTENANCE_REVIEW_PAYLOAD,
@@ -123,7 +124,7 @@ METRIC_DIRECTION: dict[str, str] = {
 
 METRIC_HINTS: dict[str, str] = {
     "Orders": "Thousands (K)",
-    "New Clients": "Thousands (K)",
+    "FTU": "Thousands (K)",
     "Returning Clients": "Thousands (K)",
     "VSL": "ISR country incl. DC",
 }
@@ -132,8 +133,8 @@ METRIC_HINTS: dict[str, str] = {
 METRIC_FORMAT: dict[str, str] = {
     "Orders": "integer",
     "DDE FEE/order": "decimal:1",
-    "New Clients": "integer",
-    "New Client Conversion": "percent:2",
+    "FTU": "integer",
+    "FTU Conversion": "percent:2",
     "Returning Clients": "integer",
     "Returning Client Conversion": "percent:2",
     "PPM%": "percent:1",
@@ -300,6 +301,7 @@ def _build_payload(
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
+        "lookerFieldAliases": LOOKER_FIELD_ALIASES,
         "userVerified": sorted(USER_VERIFIED),
         "sources": sources,
         "dataSource": METRIC_DATA_SOURCE,
@@ -1536,11 +1538,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return promotedMetricCellHtml();
       }
       const lk = CFG.looker[metric] || {};
+      const alias = (CFG.lookerFieldAliases || {})[metric];
       let link = "";
       if (lk.url) {
         link = `<a class="src-link" href="${escAttr(lk.url)}" target="_blank" rel="noopener">${linkIcon()} ${escHtml(lk.label || "Source")}</a>`;
       }
-      return `<div class="metric-name">${escHtml(metric)}</div>` + link
+      const aliasHtml = alias
+        ? `<div class="metric-hint">${escHtml(alias)}</div>`
+        : "";
+      return `<div class="metric-name">${escHtml(metric)}</div>` + aliasHtml + link
         + `<div class="weekly-row-actions">${weeklyToggleHtml(metric)}</div>`;
     }
 
