@@ -86,6 +86,7 @@ OKR_METRICS: list[MetricRow] = [
     {"name": "UP-TIME >", "leader": "OPS", "partner": "", "source": "snowflake", "workflow": "auto"},
     {"name": "UPH >", "leader": "OPS", "partner": "SC", "source": "manual", "workflow": "pending_impl"},
     {"name": "% Bad Goods Rating", "leader": "OPS", "partner": "Marketing", "source": "snowflake", "workflow": "auto"},
+    {"name": "Average Goods Rating", "leader": "OPS", "partner": "Marketing", "source": "snowflake", "workflow": "auto"},
     {"name": "Attrition (monthly) <", "leader": "OPS", "partner": "", "source": "manual", "workflow": "manual"},
     {"name": "IDP & HQ training", "leader": "HR", "partner": "", "source": "manual", "workflow": "manual"},
     {"name": "Internal Mobility", "leader": "HR", "partner": "", "source": "manual", "workflow": "manual"},
@@ -114,6 +115,7 @@ _TO_DELETE_METRICS = {
     "Ftu Conversion",
     "Returning User Sessions",
     "Returning User Conversion",
+    "Average Goods Rating",
 }
 
 LEADER_SHEET_METRICS: list[str] = [

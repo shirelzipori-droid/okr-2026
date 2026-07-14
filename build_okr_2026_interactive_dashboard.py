@@ -152,6 +152,7 @@ METRIC_FORMAT: dict[str, str] = {
     "VSL": "percent:1",
     "UP-TIME >": "percent:1",
     "% Bad Goods Rating": "percent:2",
+    "Average Goods Rating": "decimal:2",
     "New Stores": "integer",
     "Expansion": "integer",
     "Relocation": "integer",

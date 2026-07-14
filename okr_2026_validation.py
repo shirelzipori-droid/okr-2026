@@ -52,6 +52,7 @@ LOOKER: dict[str, list[float | None]] = {
     "VSL": [74.6, 67.3, 61.0, None, None, None],
     "UP-TIME >": [98.0, 97.8, 93.8, None, None, None],
     "% Bad Goods Rating": [None, None, None, None, None, None],
+    "Average Goods Rating": [4.68, 4.70, 4.71, None, None, None],
 }
 
 # Metric source registry for OKR 2026 dashboard planning.
@@ -68,6 +69,7 @@ METRIC_SOURCE: dict[str, str] = {
     "Ftu Conversion": "to_delete",
     "Returning User Sessions": "to_delete",
     "Returning User Conversion": "to_delete",
+    "Average Goods Rating": "to_delete",
     "PPM%": "snowflake_validated",
     "Shrink/DDE FEE": "snowflake_validated",
     "OFL / order (ILS)": "snowflake_validated",
@@ -551,7 +553,15 @@ USER_VERIFIED: frozenset[str] = frozenset({
     "UP-TIME >",
     "% Bad Goods Rating",
 })
-# Wolt Market Venue Conversion (Essi ✅, May 2026) — total venue sessions/CVR only;
+# Avg Goods Rating — replaced by % Bad Goods Rating on OKR; legacy WM Metrics country row.
+_LOOKER_AVG_GOODS_RATING = (
+    "https://looker.wolt.com/explore/wolt_market_exploration/wolt_market_purchases"
+    "?fields=f_purchases.time_delivered_utc_month,custom_fields.average_rating_of_goods"
+    "&f[d_venues.venue_country]=ISR"
+    "&f[d_venues.franchise_name]=woltmarket"
+    "&sorts=f_purchases.time_delivered_utc_month+desc"
+    "&limit=6&toggle=dat,fil,vis"
+)
 # does NOT split FTU vs Returning (Svenja Aug 2026).
 _LOOKER_VENUE_CONVERSION = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_venue_conversion"
@@ -594,6 +604,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
     "VSL": "Vendor Service Level % (Golden SCM 106617 · ISR incl. DC)",
     "UP-TIME >": "Weighted Uptime %",
     "% Bad Goods Rating": "Bad Goods Rating % — Golden Store Ops 106616",
+    "Average Goods Rating": "Average Rating of Goods (legacy — replaced by % Bad Goods Rating)",
     "IDQ": "Item Data Quality (Golden Selection 106615)",
 }
 
@@ -630,6 +641,10 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "VSL": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
     "UP-TIME >": ("Golden Store Ops — ISR (106616)", _LOOKER_GOLDEN_STORE_OPS),
     "% Bad Goods Rating": ("Golden Store Ops — Bad Goods Rating % (106616)", _LOOKER_GOLDEN_STORE_OPS),
+    "Average Goods Rating": (
+        "Purchases (exploration) — Average Rating of Goods",
+        _LOOKER_AVG_GOODS_RATING,
+    ),
     "IDQ": ("Golden Selection — ISR (106615)", _LOOKER_GOLDEN_SELECTION),
 }
 
@@ -664,8 +679,11 @@ SESSION_METRICS: list[str] = [
     "Returning User Conversion",
 ]
 
-# Unapproved WM Metrics source — quarantined on dashboard TO DELETE tab (not Main KPIs).
-TO_DELETE_TAB_METRICS: list[str] = list(SESSION_METRICS)
+# Unapproved / legacy OKR metrics — quarantined on dashboard TO DELETE tab (not Main KPIs).
+TO_DELETE_TAB_METRICS: list[str] = [
+    *SESSION_METRICS,
+    "Average Goods Rating",
+]
 
 
 def _parse_looker_url(url: str) -> tuple[str, str]:
@@ -986,6 +1004,19 @@ WHERE rn = 1
 ORDER BY m
 """
 
+SQL_AVG_GOODS_RATING = """
+SELECT DATE_TRUNC('month', DATE)::DATE AS m,
+  AVG_GOODS_RATING
+FROM PRODUCTION.PRESENTATION.WOLT_MARKET_METRICS
+WHERE PERIOD = 'month'
+  AND COUNTRY = 'ISR'
+  AND AREA = 'country'
+  AND VENUE_NAME IS NULL
+  AND DATE >= '2026-01-01'
+  AND DATE < '2026-07-01'
+ORDER BY m
+"""
+
 SQL_MART = """
 SELECT DATE_TRUNC('month', METRIC_DATE)::DATE AS m,
   SUM(WEIGHTED_AVAILABILITY_NUMERATOR) AS wa_num,
@@ -1258,8 +1289,9 @@ def _round_val(name: str, value: float | None) -> float | None:
     if name in ("Orders", "Ftu Sessions", "Returning User Sessions", "Area Product Selection",
                 "Maintenance costs"):
         return round(value)
-    if name in ("Order Frequency", "DDE FEE/order", "OFL / order (ILS)", "Avg Units per Order"):
-        return round(value, 1 if name == "Avg Units per Order" else 2 if name == "Order Frequency" else 1)
+    if name in ("Order Frequency", "DDE FEE/order", "OFL / order (ILS)", "Avg Units per Order",
+                "Average Goods Rating"):
+        return round(value, 1 if name == "Avg Units per Order" else 2 if name in ("Order Frequency", "Average Goods Rating") else 1)
     if "%" in name or name.endswith("%") or name in ("VP%", "PPM%", "POFR%", "VSL", "IDQ", "UP-TIME >",
                                                       "Under 45min >",
                                                       "KVI & Promo WA%", "Penetration Rate",
@@ -1551,6 +1583,14 @@ def fetch_metrics() -> tuple[
             for m, vsl_n, vsl_d in cur.fetchall():
                 i = _month_index(m)
                 data["VSL"][i] = _round_val("VSL", 100 * _safe_div(vsl_n, vsl_d))
+
+            cur.execute(SQL_AVG_GOODS_RATING)
+            for m, avg_rating in cur.fetchall():
+                i = _month_index(m)
+                data["Average Goods Rating"][i] = _round_val(
+                    "Average Goods Rating",
+                    float(avg_rating) if avg_rating is not None else None,
+                )
 
     overrides = load_user_overrides()
     for name, values in overrides.items():
