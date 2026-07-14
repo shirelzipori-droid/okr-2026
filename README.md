@@ -4,7 +4,11 @@ Dashboard and validation pipeline for OKR 2026 metrics (Jan–Dec 2026 targets, 
 
 ## Main deliverable
 
-Open in a browser:
+**Live dashboard (share this link):**
+
+https://shirelzipori-droid.github.io/okr-2026/
+
+Local file:
 
 `auto_outputs/okr_2026_interactive_dashboard.html`
 

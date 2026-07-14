@@ -86,6 +86,7 @@ DASHBOARD_MAINTENANCE_REVIEW = {
 
 ROOT = Path(__file__).resolve().parent
 OUT_HTML = ROOT / "auto_outputs" / "okr_2026_interactive_dashboard.html"
+PAGES_HTML = ROOT / "docs" / "index.html"
 LOGO_PATH = ROOT / "assets" / "wolt_market_logo.png"
 VALIDATION_HTML = ROOT / "auto_outputs" / "okr_2026_validation.html"
 
@@ -1779,9 +1780,12 @@ def main() -> None:
         actuals, _ofl_check, _vp_check, _shrink_check, _maint = fetch_metrics()
 
     payload = _build_payload(actuals)
+    html = build_html(payload)
     OUT_HTML.parent.mkdir(parents=True, exist_ok=True)
-    OUT_HTML.write_text(build_html(payload), encoding="utf-8")
-    print("Wrote", OUT_HTML.name)
+    OUT_HTML.write_text(html, encoding="utf-8")
+    PAGES_HTML.parent.mkdir(parents=True, exist_ok=True)
+    PAGES_HTML.write_text(html, encoding="utf-8")
+    print("Wrote", OUT_HTML.name, "and", PAGES_HTML.relative_to(ROOT))
 
 
 if __name__ == "__main__":
