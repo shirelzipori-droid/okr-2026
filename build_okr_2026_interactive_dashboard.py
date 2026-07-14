@@ -33,8 +33,6 @@ from okr_2026_default_targets import (
 from okr_2026_dashboard import _load_cached_metrics
 from okr_2026_validation import (
     APPROVED_LOOKER_EXPLORES,
-    ESSI_SESSION_NOTE,
-    ESSI_SESSION_PAYLOAD,
     LOOKER,
     LOOKER_EXPLORE_NOT_CERTIFIED,
     LOOKER_LINKS,
@@ -63,27 +61,6 @@ DASHBOARD_SOLD_SELECTION_REVIEW_NOTE = (
     "Do not use wolt_market_data/wolt_market_purchases (not approved). "
     "Pick a variant in the dashboard after your manager meeting."
 )
-DASHBOARD_TO_DELETE_NOTE = (
-    "Not for manager dashboards. Snowflake: presentation.wolt_market_metrics (kpi_data — deprecated, Essi: do not rely). "
-    "Looker link shows Venue Conversion (Essi ✅) but that explore has no FTU/Returning split. "
-    "Pending approved source from #ask-consumer-analytics."
-)
-DASHBOARD_ESSI_SVENJA_NOTE = (
-    "Svenja (May 2026): Venue Conversion has no built-in FTU/Returning split — "
-    "OKR requires separate fields from Snowflake presentation.wolt_market_metrics."
-)
-DASHBOARD_ESSI_SESSION = {
-    **ESSI_SESSION_PAYLOAD,
-    "note": ESSI_SESSION_NOTE,
-    "noteHe": ESSI_SESSION_NOTE,
-    "svenjaNote": DASHBOARD_ESSI_SVENJA_NOTE,
-    "kpiDeprecatedLabel": (
-        "kpi_data/wolt_market_metrics — deprecated (Essi: do not rely on, Apr–May 2026)"
-    ),
-    "venueApprovedLabel": (
-        "wolt_market_data/wolt_market_venue_conversion — Essi: sessions + session-based CVR OK"
-    ),
-}
 DASHBOARD_MAINTENANCE_REVIEW = {
     **MAINTENANCE_REVIEW_PAYLOAD,
     "noteHe": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
@@ -301,7 +278,6 @@ def _build_payload(
         "reviewMetrics": list(REVIEW_TAB_METRICS),
         "reviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
         "toDeleteMetrics": to_delete_metrics,
-        "toDeleteNote": DASHBOARD_TO_DELETE_NOTE,
         "maintenanceReviewNote": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
         "maintenanceReview": DASHBOARD_MAINTENANCE_REVIEW,
         "soldSelectionReviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
@@ -318,9 +294,6 @@ def _build_payload(
         "defaultOwners": default_owners,
         "looker": looker,
         "userVerified": sorted(USER_VERIFIED),
-        "essiSession": DASHBOARD_ESSI_SESSION,
-        "essiSessionNote": ESSI_SESSION_NOTE,
-        "essiSessionSlack": ESSI_SESSION_PAYLOAD["slackUrl"],
         "sources": sources,
         "dataSource": METRIC_DATA_SOURCE,
         "direction": {m: METRIC_DIRECTION.get(m, "higher") for m in ALL_METRIC_NAMES},
@@ -762,21 +735,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       background: var(--wolt-cyan-pale); border: 1px solid var(--wolt-cyan-muted); color: var(--wolt-cyan-deep);
     }
     .hint-banner.warn { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
-    .essi-card {
-      background: #ecfdf5; border: 1px solid #86efac; border-radius: var(--radius);
-      padding: 16px 18px; margin-bottom: 16px; color: #14532d;
-    }
-    .essi-card h3 { margin: 0 0 10px; font-size: 14px; color: #166534; }
-    .essi-quote {
-      margin: 0 0 12px; padding: 12px 14px; background: #f8fafc; border-left: 4px solid #22c55e;
-      border-radius: 8px; color: #334155; font-size: 13px; line-height: 1.55;
-    }
-    .essi-quote p { margin: 0 0 8px; }
-    .essi-quote p:last-child { margin-bottom: 0; }
     .essi-sources { width: 100%; font-size: 12px; margin-top: 10px; border-collapse: collapse; }
     .essi-sources th, .essi-sources td { border: 1px solid #166534; padding: 8px 10px; text-align: left; }
     .essi-sources th { background: #dcfce7; color: #166534; }
-    .essi-card a { color: var(--wolt-cyan-dark); }
     .essi-meta { font-size: 12px; color: #166534; margin: 8px 0 0; line-height: 1.5; }
     .weekly-row-actions { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .btn-weekly {
@@ -941,7 +902,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     <footer>
       VSL includes Wolt Market DC (ISR country). Jun OFL may be partial until UE recon closes.
-      Sessions/CVR quarantined on TO DELETE (deprecated WM Metrics). IDQ pending definition review.
+      IDQ pending definition review.
     </footer>
   </div>
 
@@ -1571,27 +1532,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       return `<div class="metric-name">${escHtml(metric)}</div>` + link
         + `<div class="weekly-row-actions">${weeklyToggleHtml(metric)}</div>`;
-    }
-
-    function renderEssiCard() {
-      const el = document.getElementById("essiSessionCard");
-      const e = CFG.essiSession;
-      if (!el || !e) return;
-      const paras = (e.quote || "").split("\n\n").map(p => `<p>${escHtml(p)}</p>`).join("");
-      el.innerHTML = `<h3>${escHtml(e.meta || "Essi")}</h3>`
-        + `<blockquote class="essi-quote">${paras}</blockquote>`
-        + `<p class="essi-meta"><a href="${escAttr(e.slackUrl)}" target="_blank" rel="noopener">Open Slack message</a>`
-        + ` · thread on NV session conversion</p>`
-        + `<table class="essi-sources"><thead><tr><th>Looker source</th><th>Status</th><th>Link</th></tr></thead><tbody>`
-        + `<tr><td><code>wolt_market_data/wolt_market_venue_conversion</code></td>`
-        + `<td>Essi ✅ — sessions + CVR</td>`
-        + `<td><a href="${escAttr(e.venueConversionUrl)}" target="_blank" rel="noopener">Venue Conversion</a></td></tr>`
-        + `<tr><td><code>kpi_data/wolt_market_metrics</code></td>`
-        + `<td>deprecated</td>`
-        + `<td><a href="${escAttr(e.kpiDeprecatedUrl)}" target="_blank" rel="noopener">WM Metrics (legacy)</a></td></tr>`
-        + `</tbody></table>`
-        + `<p class="essi-meta"><strong>Why TO DELETE?</strong> ${escHtml(e.svenjaNote || "")}</p>`
-        + `<p class="essi-meta">${escHtml(e.note || e.noteHe || "")}</p>`;
     }
 
     function renderToDelete() {
