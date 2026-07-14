@@ -1663,7 +1663,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week · Snowflake</span></th>`).join("")
           : months.map(k => {
               const i = monthIndex(k);
-              return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Snowflake / Looker ref</span></th>`;
+              return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Snowflake</span></th>`;
             }).join("")
         ) + "<th class='action-col'>Action</th></tr>";
       tbody.innerHTML = metrics.map(metric => {
@@ -1682,25 +1682,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               const monthKey = weekKey.slice(0, 7);
               const idx = monthIndex(monthKey);
               const actual = getActual(metric, idx);
-              const lkRef = (CFG.lookerRef && CFG.lookerRef[metric]) ? CFG.lookerRef[metric][idx] : null;
               return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div></div></td>`;
             }).join("")
           : months.map(monthKey => {
           const idx = monthIndex(monthKey);
           const actual = getActual(metric, idx);
-          const lkRef = (CFG.lookerRef && CFG.lookerRef[metric]) ? CFG.lookerRef[metric][idx] : null;
-          let gap = "";
-          if (lkRef !== null && lkRef !== undefined && actual !== null) {
-            const d = actual - lkRef;
-            let deltaTxt = formatDisplay(metric, d, false);
-            if (d > 0) deltaTxt = "+" + deltaTxt;
-            const refLabel = metric === "Maintenance costs" ? "NetSuite" : "Looker";
-            gap = `<div class="delta">Δ ${refLabel} ${deltaTxt}</div>`;
-          }
-          const lkLine = (lkRef !== null && lkRef !== undefined)
-            ? `<div class="target-val">${metric === "Maintenance costs" ? "NetSuite 87310" : "Looker"}: ${formatValue(metric, lkRef)}</div>`
-            : "";
-          return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>${lkLine}${gap}</div></td>`;
+          return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div></div></td>`;
         }).join("");
         let action = "";
         const leaderNote = variantKey ? "Main KPIs + KPI by Leader + Target" : "Main KPIs + Target";
