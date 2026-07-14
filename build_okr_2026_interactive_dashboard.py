@@ -925,14 +925,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     <div class="panel hidden" id="panelToDelete">
       <div class="panel-head">
-        <h2>TO DELETE — Sessions &amp; conversion (unapproved source)</h2>
+        <h2>TO DELETE</h2>
         <div class="legend">
           <span><i class="swatch-hit"></i> On target</span>
           <span><i class="swatch-miss"></i> Below target</span>
         </div>
       </div>
-      <div class="hint-banner warn" id="toDeleteBanner"></div>
-      <div id="essiSessionCard" class="essi-card"></div>
       <div class="table-scroll">
         <table id="toDeleteTable">
           <thead></thead>
@@ -1597,11 +1595,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function renderToDelete() {
-      const banner = document.getElementById("toDeleteBanner");
-      if (banner) {
-        banner.innerHTML = `<strong>Quarantined.</strong> ${escHtml(CFG.toDeleteNote || "")}`;
-      }
-      renderEssiCard();
       const metrics = toDeleteMetricsList;
       renderPerformanceTableHead("toDeleteTable", metrics);
       const tbody = document.querySelector("#toDeleteTable tbody");
