@@ -1774,16 +1774,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               const idx = monthIndex(monthKey);
               const actual = getActual(metric, idx);
               const target = getTarget(metric, monthKey);
-              if (actual === null && !manual) {
+              if (actual === null && !manual && target === null) {
                 return `<td><div class="cell-actual no-actual">—</div></td>`;
               }
-              const met = meetsTarget(actual, target, metric);
+              const met = actual !== null ? meetsTarget(actual, target, metric) : null;
               let cls = "cell-actual";
               if (target === null) cls += " no-target";
-              else { cls += met ? " hit" : " miss"; cls += " has-target"; }
+              else if (actual !== null) { cls += met ? " hit" : " miss"; cls += " has-target"; }
+              else cls += " no-target has-target";
+              let targetHtml = "";
+              if (target !== null) {
+                targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
+              }
               return `<td><div class="perf-cell-wrap"><div class="${cls}">`
                 + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
-                + `</div></div></td>`;
+                + `</div>${targetHtml}</div></td>`;
             }).join("")
           : months.map(monthKey => {
           const idx = monthIndex(monthKey);
@@ -1795,14 +1800,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             ? formatTargetDisplay(metric, override)
             : (snow !== null ? formatTargetDisplay(metric, snow) : "");
 
-          if (actual === null && !manual) {
+          if (actual === null && !manual && target === null) {
             return `<td><div class="cell-actual no-actual">—</div></td>`;
           }
 
-          const met = meetsTarget(actual, target, metric);
+          const met = actual !== null ? meetsTarget(actual, target, metric) : null;
           let cls = "cell-actual";
           if (target === null) cls += " no-target";
-          else { cls += met ? " hit" : " miss"; cls += " has-target"; }
+          else if (actual !== null) { cls += met ? " hit" : " miss"; cls += " has-target"; }
+          else cls += " no-target has-target";
 
           let actualHtml = "";
           if (manual && mIdx !== undefined) {
