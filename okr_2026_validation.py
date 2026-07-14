@@ -121,6 +121,13 @@ APPROVED_LOOKER_EXPLORES: list[dict[str, str]] = [
         "badge": "V ✅",
     },
     {
+        "key": "wolt_market_unit_economics",
+        "model": "wolt_market_data",
+        "explore": "wolt_market_unit_economics",
+        "label": "Wolt Market Unit Economics",
+        "badge": "V ✅",
+    },
+    {
         "key": "wolt_market_store_ops_reporting",
         "model": "wolt_market_dashboards",
         "explore": "wolt_market_store_ops_reporting",
@@ -264,6 +271,11 @@ _LOOKER_PPM_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
     "?qid=hsYbRIPRGonYab3VcT1tZ9&origin_space=27423&toggle=fil,vis"
 )
+# OFL / order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
+_LOOKER_OFL_WM_UE = (
+    "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
+    "?qid=KGcLGaO64nvCDney8ktgVl&origin_space=4187&toggle=fil,vis"
+)
 # Under 45min — store ops reporting (NOT Golden 106616; NOT OKR 96920 inventory).
 _LOOKER_UNDER_45_STORE_OPS = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_store_ops_reporting"
@@ -379,10 +391,13 @@ MAINTENANCE_REVIEW_NOTE = (
 IBM_VP_NOTE = (
     "IBM planning_metrics_actuals — Variable Profit ÷ GOV (Retail 1P, day sum; IBM UI in €)"
 )
-# OFL — Wolt Market Unit Economics (Look 47217): ORDER_FULFILLMENT_LABOR_RECON, ISR WM.
-OFL_UE_NOTE = (
-    "Wolt Market Unit Economics — ORDER_FULFILLMENT_LABOR_RECON (ISR, IS_WOLT_MARKET)"
+# OFL — wolt_market_data/wolt_market_unit_economics (V ✅): ORDER_FULFILLMENT_LABOR_RECON, ISR WM.
+OFL_WM_UE_NOTE = (
+    "Wolt Market Unit Economics — ORDER_FULFILLMENT_LABOR_RECON ÷ purchases "
+    "(ISR, IS_WOLT_MARKET; Snowflake: F_UNIT_ECONOMICS_RECONCILIATION)"
 )
+# Back-compat alias for dashboard imports.
+OFL_UE_NOTE = OFL_WM_UE_NOTE
 VP_UE_NOTE = (
     "UE cross-check — VARIABLE_PROFIT_RECON ÷ GOV_VAT0_TOTAL (ISR, IS_WOLT_MARKET)"
 )
@@ -590,7 +605,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
     "Returning Client Conversion": "Returning Client Conversion (Golden) · month + weekly",
     "PPM%": "Product Profit Margin %",
     "Shrink/DDE FEE": "Shrinkage Share of Subtotal (Golden 106617)",
-    "OFL / order (ILS)": "ORDER_FULFILLMENT_LABOR_RECON / Purchase",
+    "OFL / order (ILS)": "Order Fulfillment Labor / Order (WM Unit Economics)",
     "Maintenance costs": "NetSuite 87310 Store maintenance (kILS; IBM reconciliation pending)",
     "VP%": "Variable Profit ÷ GOV (IBM)",
     "Weighted Availability": "Weighted Availability % (Golden / MART)",
@@ -625,7 +640,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Returning Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "PPM%": ("WM Venue Metrics Aggregated — PPM (ISR)", _LOOKER_PPM_AGGREGATED),
     "Shrink/DDE FEE": ("Golden SCM — Shrink/DDE FEE (106617)", _LOOKER_GOLDEN_SCM),
-    "OFL / order (ILS)": ("Wolt Market Unit Economics (Look 47217)", _LOOKER_UE_ISR),
+    "OFL / order (ILS)": ("WM Unit Economics — OFL (ISR)", _LOOKER_OFL_WM_UE),
     "Maintenance costs": ("NetSuite Mgmt PL — 87310 (reconciliation)", ""),
     "VP%": ("IBM — planning_metrics_actuals", ""),
     "Weighted Availability": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
@@ -1916,8 +1931,9 @@ def build_html(
             )
         ofl_block = f"""
   <div class="card">
-    <h2 class="ok">OFL / order — ולידציה כפולה (Wolt Market Unit Economics)</h2>
-    <p class="meta">{OFL_UE_NOTE}</p>
+    <h2 class="ok">OFL / order — ולידציה (Wolt Market Unit Economics)</h2>
+    <p class="meta">{OFL_WM_UE_NOTE}</p>
+    <p class="meta">Looker: <a href="{_LOOKER_OFL_WM_UE}" target="_blank" rel="noopener">wolt_market_data/wolt_market_unit_economics</a> (V ✅)</p>
     <p class="meta">שיטה A: ממוצע <code>ORDER_FULFILLMENT_LABOR_RECON</code> להזמנה ·
     שיטה B: סך OFL ÷ מספר הזמנות · ערך הדשבורד = שיטה B.</p>
     <table class="tbl">
@@ -1983,7 +1999,7 @@ def build_html(
     <ul>
       <li><strong>Unit Economics</strong> — Orders, DDE (OFL &amp; VP — see cross-check below)</li>
       <li><strong>PPM%</strong> — {PPM_MART_NOTE} · Looker field: <em>Product Profit Margin %</em></li>
-      <li><strong>OFL / order</strong> — {OFL_UE_NOTE}</li>
+      <li><strong>OFL / order</strong> — {OFL_WM_UE_NOTE}</li>
       <li><strong>VP%</strong> — {IBM_VP_NOTE} (UE cross-check below)</li>
       <li><strong>Shrink/DDE FEE</strong> — {GOLDEN_SHRINK_NOTE} · Looker field: <em>Shrinkage Share of Subtotal</em> (<code>shrinkage_share_of_subtotal</code>)</li>
       <li><strong>Maintenance costs</strong> — {MAINTENANCE_REVIEW_NOTE} · KPI by Leader (לא בלשונית לבדיקה) · {IBM_MAINTENANCE_NOTE}</li>
