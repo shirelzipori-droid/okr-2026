@@ -281,7 +281,12 @@ _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
     "?qid=KGcLGaO64nvCDney8ktgVl&origin_space=4187&toggle=fil,vis"
 )
-# Under 45min — store ops reporting (NOT Golden 106616; NOT OKR 96920 inventory).
+# Under 45min — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
+_LOOKER_UNDER_45_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=ezn0o2UrbgfDyi7UmFynjh&origin_space=27423&toggle=vis"
+)
+# Legacy — store ops reporting (superseded by venue metrics aggregated qid above).
 _LOOKER_UNDER_45_STORE_OPS = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_store_ops_reporting"
     "?fields=wolt_market_store_ops_reporting.metric_date,"
@@ -659,7 +664,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
         _looker_sold_selection_url("sold_from_product_selection_perc"),
     ),
     "POFR%": ("WM Venue Metrics Aggregated — POFR (ISR)", _LOOKER_POFR_AGGREGATED),
-    "Under 45min >": ("WM Store Ops — Under 45min (ISR)", _LOOKER_UNDER_45_STORE_OPS),
+    "Under 45min >": ("WM Venue Metrics Aggregated — Under 45min (ISR)", _LOOKER_UNDER_45_AGGREGATED),
     "Avg Units per Order": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Order Frequency": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Penetration Rate": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),

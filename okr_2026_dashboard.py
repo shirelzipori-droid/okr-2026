@@ -113,7 +113,7 @@ SC_APPROVAL: dict[str, str] = {
         f"ממתין לאימות · exploration Purchases V ✅ · {SOLD_FROM_SELECTION_NOTE}"
     ),
     "POFR%": f"✅ verified by user · {GOLDEN_POFR_NOTE}",
-    "Under 45min >": "✅ verified by user · WM Store Ops reporting V ✅ · MART delivered_under_45_minutes_orders_rate",
+    "Under 45min >": "✅ verified by user · WM Venue Metrics Aggregated · MART delivered_under_45_minutes_orders_rate",
     "Avg Units per Order": "✅ verified by user · Golden Growth 106613 · TOTAL_UNITS ÷ TOTAL_ORDERS (ISR network row)",
     "Maintenance costs": f"לבדיקה · {MAINTENANCE_REVIEW_NOTE}",
     "Avg Units per Order": "✅ verified by user · Golden Growth 106613 · TOTAL_UNITS ÷ TOTAL_ORDERS (ISR network row)",
