@@ -45,6 +45,7 @@ from okr_2026_validation import (
     TO_DELETE_TAB_METRICS,
     USER_VERIFIED,
     WEEKLY_OKR_METRICS,
+    WEEKLY_REVIEW_METRICS,
     fetch_metrics,
     fetch_metrics_weekly,
     load_weekly_cache,
@@ -311,6 +312,7 @@ def _build_payload(
             "soldChoice": STORAGE_SOLD_CHOICE,
         },
         "weeklyMetrics": list(WEEKLY_OKR_METRICS),
+        "weeklyReviewMetrics": list(WEEKLY_REVIEW_METRICS),
         "weekKeys": (weekly_payload or {}).get("weekKeys", []),
         "weekLabels": (weekly_payload or {}).get("weekLabels", []),
         "actualsWeekly": (weekly_payload or {}).get("actuals", {}),
@@ -929,7 +931,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     const weeklyModeMetrics = new Set();
 
     function hasWeeklyView(metric) {
-      return (CFG.weeklyMetrics || []).includes(metric);
+      return (CFG.weeklyMetrics || []).includes(metric)
+        || (CFG.weeklyReviewMetrics || []).includes(metric);
     }
 
     function isWeeklyMode(metric) {
@@ -994,6 +997,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           else weeklyModeMetrics.add(m);
           renderPerformance();
           renderLeader();
+          renderReview();
         });
       });
     }
@@ -1584,25 +1588,44 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           + (CFG.soldSelectionReviewNote
             ? `<strong>Sold from selection:</strong> ${CFG.soldSelectionReviewNote} `
             : "")
-          + " <strong>Looker Purchases:</strong> wolt_market_exploration (V ✅) only — not wolt_market_data.";
+          + " <strong>Looker Purchases:</strong> wolt_market_exploration (V ✅) only — not wolt_market_data."
+          + " · <strong>Weekly:</strong> use WEEKLY toggle on each metric (last 6 completed weeks).";
       }
+      const metrics = CFG.reviewMetrics || [];
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const anyWeekly = metrics.some(m => isWeeklyMode(m));
+      const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
       const thead = document.querySelector("#reviewTable thead");
       const tbody = document.querySelector("#reviewTable tbody");
       if (!thead || !tbody) return;
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
-        + months.map(k => {
-          const i = monthIndex(k);
-          return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Snowflake / Looker ref</span></th>`;
-        }).join("") + "<th class='action-col'>Action</th></tr>";
-      const metrics = CFG.reviewMetrics || [];
+        + (anyWeekly
+          ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week · Snowflake</span></th>`).join("")
+          : months.map(k => {
+              const i = monthIndex(k);
+              return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Snowflake / Looker ref</span></th>`;
+            }).join("")
+        ) + "<th class='action-col'>Action</th></tr>";
       tbody.innerHTML = metrics.map(metric => {
         const o = getOwner(metric);
         const variantKey = Object.keys(CFG.soldSelectionVariants || {}).find(
           k => CFG.soldSelectionVariants[k].metricName === metric
         );
         const isChosen = variantKey && soldSelectionChoice === variantKey;
-        const cells = months.map(monthKey => {
+        const weeklyRow = isWeeklyMode(metric);
+        const cells = anyWeekly
+          ? weekPeriods.map(weekKey => {
+              if (weeklyRow) {
+                const actual = getWeeklyActual(metric, weekKey);
+                return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div></div></td>`;
+              }
+              const monthKey = weekKey.slice(0, 7);
+              const idx = monthIndex(monthKey);
+              const actual = getActual(metric, idx);
+              const lkRef = (CFG.lookerRef && CFG.lookerRef[metric]) ? CFG.lookerRef[metric][idx] : null;
+              return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div></div></td>`;
+            }).join("")
+          : months.map(monthKey => {
           const idx = monthIndex(monthKey);
           const actual = getActual(metric, idx);
           const lkRef = (CFG.lookerRef && CFG.lookerRef[metric]) ? CFG.lookerRef[metric][idx] : null;
@@ -1628,8 +1651,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
             action = `<button type="button" class="btn btn-primary" data-sold-choice="${escAttr(variantKey)}">Use in dashboard</button>`;
           }
         }
-        const rowCls = isChosen ? " class='row-selected'" : "";
-        return `<tr${rowCls}><td class="leader-col">${o.leader || "—"}</td><td class="partner-col">${o.partner || "—"}</td><td class="metric-cell">${metricCellHtml(metric)}</td>${cells}<td class="action-col">${action}</td></tr>`;
+        let rowCls = isChosen ? "row-selected" : "";
+        if (weeklyRow) rowCls = (rowCls ? rowCls + " " : "") + "row-weekly-mode";
+        const rowClsAttr = rowCls ? ` class="${rowCls}"` : "";
+        return `<tr${rowClsAttr}><td class="leader-col">${o.leader || "—"}</td><td class="partner-col">${o.partner || "—"}</td><td class="metric-cell">${metricCellHtml(metric)}</td>${cells}<td class="action-col">${action}</td></tr>`;
       }).join("");
       tbody.querySelectorAll("[data-sold-choice]").forEach(btn => {
         btn.addEventListener("click", () => setSoldSelectionChoice(btn.dataset.soldChoice));
@@ -1637,6 +1662,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       tbody.querySelectorAll("[data-sold-clear]").forEach(btn => {
         btn.addEventListener("click", () => clearSoldSelectionChoice());
       });
+      bindWeeklyToggles(tbody);
     }
 
     function actualInlineInputHtml(metric, mIdx, monthKey, shown) {

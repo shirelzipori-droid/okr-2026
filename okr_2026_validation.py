@@ -1136,7 +1136,7 @@ def _month_index(d: date) -> int:
     return d.month - 1
 
 
-# Metrics with a weekly drill-down in the interactive dashboard (Jan–Jun 2026).
+# Metrics with weekly drill-down on Main KPIs tab.
 WEEKLY_OKR_METRICS: tuple[str, ...] = (
     "Orders",
     "DDE FEE/order",
@@ -1147,6 +1147,15 @@ WEEKLY_OKR_METRICS: tuple[str, ...] = (
     "POFR%",
     "Under 45min >",
 )
+
+# Weekly drill-down on For review tab (client growth + sold-from-selection variants).
+WEEKLY_REVIEW_METRICS: tuple[str, ...] = (
+    *CLIENT_GROWTH_REVIEW_METRICS,
+    "Sold from selection — sold_from_selection_perc",
+    "Sold from selection — sold_from_product_selection_perc",
+)
+
+ALL_WEEKLY_METRICS: tuple[str, ...] = WEEKLY_OKR_METRICS + WEEKLY_REVIEW_METRICS
 
 WEEKLY_CACHE_JSON = ROOT / "auto_outputs" / "okr_2026_weekly_cache.json"
 WEEKLY_RANGE_START = date(2026, 1, 5)
@@ -1285,6 +1294,30 @@ WHERE VENUE_COUNTRY = 'ISR'
 GROUP BY 1
 ORDER BY 1
 """,
+        "sold_selection": f"""
+WITH net AS (
+  SELECT DATE::DATE AS wk,
+    SOLD_PRODUCTS_FROM_SELECTION_PERC,
+    SOLD_ITEMS_FROM_SELECTION_PERC,
+    ROW_NUMBER() OVER (
+      PARTITION BY DATE
+      ORDER BY TOTAL_ORDERS DESC NULLS LAST
+    ) AS rn
+  FROM PRODUCTION.PRESENTATION.WOLT_MARKET_METRICS
+  WHERE PERIOD = 'week'
+    AND COUNTRY = 'ISR'
+    AND AREA = 'country'
+    AND VENUE_NAME IS NULL
+    AND DATE >= '{start}'
+    AND DATE < '{sql_end}'
+)
+SELECT wk,
+  SOLD_PRODUCTS_FROM_SELECTION_PERC,
+  SOLD_ITEMS_FROM_SELECTION_PERC
+FROM net
+WHERE rn = 1
+ORDER BY 1
+""",
     }
 
 
@@ -1295,7 +1328,7 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
     week_index = {k: i for i, k in enumerate(week_keys)}
     n_weeks = len(week_keys)
     data: dict[str, list[float | None]] = {
-        m: [None] * n_weeks for m in WEEKLY_OKR_METRICS
+        m: [None] * n_weeks for m in ALL_WEEKLY_METRICS
     }
     sql = _build_weekly_sql_templates(_weekly_sql_end(as_of))
 
@@ -1315,6 +1348,14 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
                 set_weekly("DDE FEE/order", wk, _safe_div(dde_sum, orders))
                 set_weekly("PPM%", wk, 100 * _safe_div(ppm_num, wm_sub))
 
+            cur.execute(sql["clients"])
+            for row in cur.fetchall():
+                wk, new_c, ret_c, new_cn, new_cd, ret_cn, ret_cd = row
+                set_weekly("New Clients", wk, new_c / 1000)
+                set_weekly("Returning Clients", wk, ret_c / 1000)
+                set_weekly("New Client Conversion", wk, 100 * _safe_div(new_cn, new_cd))
+                set_weekly("Returning Client Conversion", wk, 100 * _safe_div(ret_cn, ret_cd))
+
             cur.execute(sql["mart"])
             for row in cur.fetchall():
                 (wk, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d) = row
@@ -1332,12 +1373,26 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
                     float(shrink_share) if shrink_share is not None else None,
                 )
 
+            cur.execute(sql["sold_selection"])
+            for row in cur.fetchall():
+                wk, sold_products, sold_items = row
+                set_weekly(
+                    "Sold from selection — sold_from_selection_perc",
+                    wk,
+                    float(sold_products) * 100 if sold_products is not None else None,
+                )
+                set_weekly(
+                    "Sold from selection — sold_from_product_selection_perc",
+                    wk,
+                    float(sold_items) * 100 if sold_items is not None else None,
+                )
+
     return {
         "weekKeys": week_keys,
         "weekLabels": week_labels,
         "lastCompletedWeekStart": anchor.isoformat(),
         "dataAsOf": as_of.isoformat(),
-        "metrics": list(WEEKLY_OKR_METRICS),
+        "metrics": list(ALL_WEEKLY_METRICS),
         "actuals": data,
     }
 
