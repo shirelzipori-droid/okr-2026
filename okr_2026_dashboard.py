@@ -27,6 +27,7 @@ from okr_2026_validation import (
     GOLDEN_WA_NOTE,
     IBM_VP_NOTE,
     OFL_UE_NOTE,
+    PPM_MART_NOTE,
     VP_UE_NOTE,
     LOOKER_FIELD_ALIASES,
     LOOKER_LINKS,
@@ -99,7 +100,7 @@ SC_APPROVAL: dict[str, str] = {
     "Returning Client Conversion": (
         f"✅ Golden Growth 106613 · Returning Client Conversion (country dedup)"
     ),
-    "PPM%": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 · Product Profit Margin %",
+    "PPM%": f"✅ verified by user · {PPM_MART_NOTE}",
     "Shrink/DDE FEE": f"Golden SCM 106617 — Snowflake auto · {GOLDEN_SHRINK_NOTE}",
     "OFL / order (ILS)": f"✅ verified by user · Wolt Market UE · {OFL_UE_NOTE}",
     "VP%": f"✅ verified by user · {IBM_VP_NOTE}",

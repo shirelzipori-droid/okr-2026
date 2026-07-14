@@ -259,6 +259,11 @@ _LOOKER_POFR_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
     "?qid=uYst64GAXk7COWPNzoLPTC&origin_space=27423&toggle=fil,vis"
 )
+# PPM% — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
+_LOOKER_PPM_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=hsYbRIPRGonYab3VcT1tZ9&origin_space=27423&toggle=fil,vis"
+)
 # Under 45min — store ops reporting (NOT Golden 106616; NOT OKR 96920 inventory).
 _LOOKER_UNDER_45_STORE_OPS = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_store_ops_reporting"
@@ -393,6 +398,11 @@ GOLDEN_POFR_NOTE = (
     "Golden Store Ops 106616 / wolt_market_venue_metrics_aggregated — "
     "MART perfect_order_fulfillment_ratio numerator ÷ denominator "
     "(ISR Wolt Market stores, country aggregate)"
+)
+PPM_MART_NOTE = (
+    "WM Venue Metrics Aggregated — Product Profit Margin % "
+    "(MART: TOTAL_SUBTOTAL_VAT0_LOCAL_SUM − |COGS| ÷ TOTAL_SUBTOTAL_VAT0_LOCAL_SUM, "
+    "ISR Wolt Market stores, country aggregate)"
 )
 # Sold from selection — wolt_market_item_metrics view (wolt_market_data model); not on Golden 106615.
 SOLD_FROM_SELECTION_PROMOTED_NAME = "Sold from selection (store level)"
@@ -613,7 +623,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "FTU Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Clients": ("Golden Growth — Returning Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
-    "PPM%": ("UE — ISR WM (Look 47217)", _LOOKER_UE_ISR),
+    "PPM%": ("WM Venue Metrics Aggregated — PPM (ISR)", _LOOKER_PPM_AGGREGATED),
     "Shrink/DDE FEE": ("Golden SCM — Shrink/DDE FEE (106617)", _LOOKER_GOLDEN_SCM),
     "OFL / order (ILS)": ("Wolt Market Unit Economics (Look 47217)", _LOOKER_UE_ISR),
     "Maintenance costs": ("NetSuite Mgmt PL — 87310 (reconciliation)", ""),
@@ -791,9 +801,7 @@ NON_MATCHING_METRICS = (
 SQL_UE = """
 SELECT DATE_TRUNC('month', o.TIMESTAMP)::DATE AS m,
   COUNT(DISTINCT o.PURCHASE_ID) AS orders,
-  SUM(p.WOLT_MARKET_SUBTOTAL_VAT0_LOCAL) AS dde_sum,
-  SUM(o.WOLT_MARKET_SUBTOTAL) AS wm_subtotal,
-  SUM(o.WOLT_MARKET_SUBTOTAL) - ABS(SUM(o.COST_OF_INVENTORY_COGS)) AS ppm_num
+  SUM(p.WOLT_MARKET_SUBTOTAL_VAT0_LOCAL) AS dde_sum
 FROM PRODUCTION.PRESENTATION.F_UNIT_ECONOMICS_OPERATIONAL o
 JOIN PRODUCTION.PRESENTATION.F_UNIT_ECONOMICS_PURCHASES p
   ON o.PURCHASE_ID = p.PURCHASE_ID
@@ -1090,7 +1098,9 @@ SELECT DATE_TRUNC('month', METRIC_DATE)::DATE AS m,
   SUM(TOTAL_ORDERS_COUNT) AS u45_den,
   SUM(VENUE_BAD_GOODS_RATING_ORDERS_COUNT) AS bad_goods_num,
   SUM(WEIGHTED_UPTIME_RATIO_NUMERATOR) AS up_num,
-  SUM(WEIGHTED_UPTIME_RATIO_DENOMINATOR) AS up_den
+  SUM(WEIGHTED_UPTIME_RATIO_DENOMINATOR) AS up_den,
+  100 * (SUM(TOTAL_SUBTOTAL_VAT0_LOCAL_SUM) - ABS(SUM(TOTAL_COST_OF_INVENTORY_COGS)))
+    / NULLIF(SUM(TOTAL_SUBTOTAL_VAT0_LOCAL_SUM), 0) AS ppm_pct
 FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_MONTHLY
 WHERE VENUE_COUNTRY = 'ISR'
   AND RETAIL_PLATFORM_VENUE_NAME LIKE 'Wolt Market |%'
@@ -1205,9 +1215,7 @@ def _build_weekly_sql_templates(sql_end: str) -> dict[str, str]:
         "ue": f"""
 SELECT DATE_TRUNC('week', o.TIMESTAMP)::DATE AS wk,
   COUNT(DISTINCT o.PURCHASE_ID) AS orders,
-  SUM(p.WOLT_MARKET_SUBTOTAL_VAT0_LOCAL) AS dde_sum,
-  SUM(o.WOLT_MARKET_SUBTOTAL) AS wm_subtotal,
-  SUM(o.WOLT_MARKET_SUBTOTAL) - ABS(SUM(o.COST_OF_INVENTORY_COGS)) AS ppm_num
+  SUM(p.WOLT_MARKET_SUBTOTAL_VAT0_LOCAL) AS dde_sum
 FROM PRODUCTION.PRESENTATION.F_UNIT_ECONOMICS_OPERATIONAL o
 JOIN PRODUCTION.PRESENTATION.F_UNIT_ECONOMICS_PURCHASES p
   ON o.PURCHASE_ID = p.PURCHASE_ID
@@ -1269,7 +1277,9 @@ SELECT METRIC_DATE AS wk,
   SUM(PERFECT_ORDER_FULFILLMENT_RATIO_NUMERATOR) AS pofr_num,
   SUM(PERFECT_ORDER_FULFILLMENT_RATIO_DENOMINATOR) AS pofr_den,
   SUM(DELIVERED_UNDER_45_MINUTES_ORDERS_COUNT) AS u45_num,
-  SUM(TOTAL_ORDERS_COUNT) AS u45_den
+  SUM(TOTAL_ORDERS_COUNT) AS u45_den,
+  100 * (SUM(TOTAL_SUBTOTAL_VAT0_LOCAL_SUM) - ABS(SUM(TOTAL_COST_OF_INVENTORY_COGS)))
+    / NULLIF(SUM(TOTAL_SUBTOTAL_VAT0_LOCAL_SUM), 0) AS ppm_pct
 FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_WEEKLY
 WHERE VENUE_COUNTRY = 'ISR'
   AND RETAIL_PLATFORM_VENUE_NAME LIKE 'Wolt Market |%'
@@ -1343,10 +1353,9 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
         with conn.cursor() as cur:
             cur.execute(sql["ue"])
             for row in cur.fetchall():
-                wk, orders, dde_sum, wm_sub, ppm_num = row
+                wk, orders, dde_sum = row
                 set_weekly("Orders", wk, orders / 1000)
                 set_weekly("DDE FEE/order", wk, _safe_div(dde_sum, orders))
-                set_weekly("PPM%", wk, 100 * _safe_div(ppm_num, wm_sub))
 
             cur.execute(sql["clients"])
             for row in cur.fetchall():
@@ -1358,11 +1367,16 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
 
             cur.execute(sql["mart"])
             for row in cur.fetchall():
-                (wk, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d) = row
+                (wk, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d, ppm_pct) = row
                 set_weekly("Weighted Availability", wk, 100 * _safe_div(wa_n, wa_d))
                 set_weekly("KVI & Promo WA%", wk, 100 * _safe_div(kvi_n, kvi_d))
                 set_weekly("POFR%", wk, 100 * _safe_div(pofr_n, pofr_d))
                 set_weekly("Under 45min >", wk, 100 * _safe_div(u45_n, u45_d))
+                set_weekly(
+                    "PPM%",
+                    wk,
+                    float(ppm_pct) if ppm_pct is not None else None,
+                )
 
             cur.execute(sql["shrink"])
             for row in cur.fetchall():
@@ -1599,11 +1613,10 @@ def fetch_metrics() -> tuple[
         with conn.cursor() as cur:
             cur.execute(SQL_UE)
             for row in cur.fetchall():
-                m, orders, dde_sum, wm_sub, ppm_num = row
+                m, orders, dde_sum = row
                 i = _month_index(m)
                 data["Orders"][i] = round(orders / 1000)
                 data["DDE FEE/order"][i] = _round_val("DDE FEE/order", _safe_div(dde_sum, orders))
-                data["PPM%"][i] = _round_val("PPM%", 100 * _safe_div(ppm_num, wm_sub))
 
             ofl_check = _load_ofl_from_cursor(cur)
             for i in range(6):
@@ -1686,8 +1699,12 @@ def fetch_metrics() -> tuple[
             cur.execute(SQL_MART)
             for row in cur.fetchall():
                 (m, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d,
-                 bad_goods_n, up_n, up_d) = row
+                 bad_goods_n, up_n, up_d, ppm_pct) = row
                 i = _month_index(m)
+                data["PPM%"][i] = _round_val(
+                    "PPM%",
+                    float(ppm_pct) if ppm_pct is not None else None,
+                )
                 data["Weighted Availability"][i] = _round_val(
                     "Weighted Availability", 100 * _safe_div(wa_n, wa_d)
                 )
@@ -1964,7 +1981,8 @@ def build_html(
 
     sources = f"""
     <ul>
-      <li><strong>Unit Economics</strong> — Orders, DDE, PPM (OFL &amp; VP — see cross-check below)</li>
+      <li><strong>Unit Economics</strong> — Orders, DDE (OFL &amp; VP — see cross-check below)</li>
+      <li><strong>PPM%</strong> — {PPM_MART_NOTE} · Looker field: <em>Product Profit Margin %</em></li>
       <li><strong>OFL / order</strong> — {OFL_UE_NOTE}</li>
       <li><strong>VP%</strong> — {IBM_VP_NOTE} (UE cross-check below)</li>
       <li><strong>Shrink/DDE FEE</strong> — {GOLDEN_SHRINK_NOTE} · Looker field: <em>Shrinkage Share of Subtotal</em> (<code>shrinkage_share_of_subtotal</code>)</li>
