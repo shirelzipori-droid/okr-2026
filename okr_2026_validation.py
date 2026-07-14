@@ -271,6 +271,11 @@ _LOOKER_PPM_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
     "?qid=hsYbRIPRGonYab3VcT1tZ9&origin_space=27423&toggle=fil,vis"
 )
+# Weighted Availability — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
+_LOOKER_WA_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=agdCClyokjNQnARdjFoiBx&origin_space=27423&toggle=vis"
+)
 # OFL / order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
 _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
@@ -402,8 +407,8 @@ VP_UE_NOTE = (
     "UE cross-check — VARIABLE_PROFIT_RECON ÷ GOV_VAT0_TOTAL (ISR, IS_WOLT_MARKET)"
 )
 GOLDEN_WA_NOTE = (
-    "Golden Dashboard 106617 — MART weighted_availability numerator ÷ denominator "
-    "(ISR Wolt Market stores, country aggregate)"
+    "WM Venue Metrics Aggregated / Golden 106617 — MART weighted_availability "
+    "numerator ÷ denominator (ISR Wolt Market stores, country aggregate)"
 )
 GOLDEN_KVI_NOTE = (
     "Golden Dashboard 106617 — KVI Category Promo Weighted Availability % "
@@ -643,7 +648,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "OFL / order (ILS)": ("WM Unit Economics — OFL (ISR)", _LOOKER_OFL_WM_UE),
     "Maintenance costs": ("NetSuite Mgmt PL — 87310 (reconciliation)", ""),
     "VP%": ("IBM — planning_metrics_actuals", ""),
-    "Weighted Availability": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
+    "Weighted Availability": ("WM Venue Metrics Aggregated — WA (ISR)", _LOOKER_WA_AGGREGATED),
     "KVI & Promo WA%": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
     "Sold from selection — sold_from_selection_perc": (
         "Purchases (exploration) — Sold from Selection %",
