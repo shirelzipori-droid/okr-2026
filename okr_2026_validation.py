@@ -9,7 +9,7 @@ Usage:
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -1040,6 +1040,208 @@ def _month_index(d: date) -> int:
     return d.month - 1
 
 
+# Metrics with a weekly drill-down in the interactive dashboard (Jan–Jun 2026).
+WEEKLY_OKR_METRICS: tuple[str, ...] = (
+    "Orders",
+    "DDE FEE/order",
+    "Ftu Sessions",
+    "Ftu Conversion",
+    "Returning User Sessions",
+    "Returning User Conversion",
+    "PPM%",
+    "Shrink/DDE FEE",
+    "Weighted Availability",
+    "KVI & Promo WA%",
+    "POFR%",
+    "Under 45min >",
+)
+
+WEEKLY_CACHE_JSON = ROOT / "auto_outputs" / "okr_2026_weekly_cache.json"
+WEEKLY_RANGE_START = date(2026, 1, 5)
+
+
+def last_completed_week_start(as_of: date | None = None) -> date:
+    """Monday of the last fully completed ISO week (never the in-progress week)."""
+    today = as_of or date.today()
+    current_week_monday = today - timedelta(days=today.weekday())
+    return current_week_monday - timedelta(days=7)
+
+
+def build_okr_week_keys(as_of: date | None = None) -> tuple[list[str], list[str], date]:
+    """Monday week-start keys from OKR start through last completed week."""
+    anchor = last_completed_week_start(as_of)
+    weeks: list[date] = []
+    d = WEEKLY_RANGE_START
+    while d <= anchor:
+        weeks.append(d)
+        d += timedelta(days=7)
+    keys = [w.isoformat() for w in weeks]
+    labels = [w.strftime("%d %b") for w in weeks]
+    return keys, labels, anchor
+
+
+def trailing_completed_week_keys(n: int, as_of: date | None = None) -> list[str]:
+    """Last n completed weeks ending at last_completed_week_start (oldest → newest)."""
+    if n <= 0:
+        return []
+    anchor = last_completed_week_start(as_of)
+    out: list[str] = []
+    d = anchor
+    for _ in range(n):
+        out.append(d.isoformat())
+        d -= timedelta(days=7)
+    out.reverse()
+    return out
+
+
+def _weekly_sql_end(as_of: date | None = None) -> str:
+    return (last_completed_week_start(as_of) + timedelta(days=7)).isoformat()
+
+
+def _build_weekly_sql_templates(sql_end: str) -> dict[str, str]:
+    start = WEEKLY_RANGE_START.isoformat()
+    return {
+        "ue": f"""
+SELECT DATE_TRUNC('week', o.TIMESTAMP)::DATE AS wk,
+  COUNT(DISTINCT o.PURCHASE_ID) AS orders,
+  SUM(p.WOLT_MARKET_SUBTOTAL_VAT0_LOCAL) AS dde_sum,
+  SUM(o.WOLT_MARKET_SUBTOTAL) AS wm_subtotal,
+  SUM(o.WOLT_MARKET_SUBTOTAL) - ABS(SUM(o.COST_OF_INVENTORY_COGS)) AS ppm_num
+FROM PRODUCTION.PRESENTATION.F_UNIT_ECONOMICS_OPERATIONAL o
+JOIN PRODUCTION.PRESENTATION.F_UNIT_ECONOMICS_PURCHASES p
+  ON o.PURCHASE_ID = p.PURCHASE_ID
+WHERE o.COUNTRY = 'ISR'
+  AND o.IS_WOLT_MARKET = TRUE
+  AND o.TIMESTAMP >= '{start}'
+  AND o.TIMESTAMP < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+        "sessions": f"""
+SELECT DATE::DATE AS wk,
+  SUM(FTU_SESSIONS) AS ftu_sessions,
+  SUM(FTU_ORDERS) AS ftu_orders,
+  SUM(RETURNING_USER_SESSIONS) AS ret_sessions,
+  SUM(RETURNING_USER_ORDERS) AS ret_orders
+FROM PRODUCTION.PRESENTATION.WOLT_MARKET_METRICS
+WHERE PERIOD = 'week'
+  AND COUNTRY = 'ISR'
+  AND VENUE_NAME LIKE 'Wolt Market |%'
+  AND DATE >= '{start}'
+  AND DATE < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+        "mart": f"""
+SELECT METRIC_DATE AS wk,
+  SUM(WEIGHTED_AVAILABILITY_NUMERATOR) AS wa_num,
+  SUM(WEIGHTED_AVAILABILITY_DENOMINATOR) AS wa_den,
+  SUM(KVI_CAT_PROMO_WEIGHTED_AVAILABILITY_NUMERATOR) AS kvi_num,
+  SUM(KVI_CAT_PROMO_WEIGHTED_AVAILABILITY_DENOMINATOR) AS kvi_den,
+  SUM(PERFECT_ORDER_FULFILLMENT_RATIO_NUMERATOR) AS pofr_num,
+  SUM(PERFECT_ORDER_FULFILLMENT_RATIO_DENOMINATOR) AS pofr_den,
+  SUM(DELIVERED_UNDER_45_MINUTES_ORDERS_COUNT) AS u45_num,
+  SUM(TOTAL_ORDERS_COUNT) AS u45_den
+FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_WEEKLY
+WHERE VENUE_COUNTRY = 'ISR'
+  AND RETAIL_PLATFORM_VENUE_NAME LIKE 'Wolt Market |%'
+  AND METRIC_DATE >= '{start}'
+  AND METRIC_DATE < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+        "shrink": f"""
+SELECT METRIC_DATE AS wk,
+  AVG(ROUND(ABS(100 * SHRINKED_UNITS_VALUE_LOCAL / NULLIF(TOTAL_SUBTOTAL_LOCAL_SUM, 0)), 1))
+    AS shrink_share_of_subtotal
+FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_WEEKLY
+WHERE VENUE_COUNTRY = 'ISR'
+  AND RETAIL_PLATFORM_FRANCHISE_NAME = 'woltmarket'
+  AND WOLT_PRODUCT_LINE_HIERARCHY_3 = 'supermarket'
+  AND RETAIL_PLATFORM_VENUE_NAME LIKE 'Wolt Market |%'
+  AND RETAIL_PLATFORM_VENUE_STATUS = 'ACTIVE'
+  AND TOTAL_SUBTOTAL_LOCAL_SUM > 0
+  AND METRIC_DATE >= '{start}'
+  AND METRIC_DATE < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+    }
+
+
+def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
+    """Weekly actuals — trailing from last completed week (Monday week starts)."""
+    as_of = as_of or date.today()
+    week_keys, week_labels, anchor = build_okr_week_keys(as_of)
+    week_index = {k: i for i, k in enumerate(week_keys)}
+    n_weeks = len(week_keys)
+    data: dict[str, list[float | None]] = {
+        m: [None] * n_weeks for m in WEEKLY_OKR_METRICS
+    }
+    sql = _build_weekly_sql_templates(_weekly_sql_end(as_of))
+
+    def set_weekly(metric: str, wk: date, value: float | None) -> None:
+        key = wk.isoformat() if isinstance(wk, date) else str(wk)[:10]
+        i = week_index.get(key)
+        if i is None:
+            return
+        data[metric][i] = _round_val(metric, value)
+
+    with snowflake_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql["ue"])
+            for row in cur.fetchall():
+                wk, orders, dde_sum, wm_sub, ppm_num = row
+                set_weekly("Orders", wk, orders / 1000)
+                set_weekly("DDE FEE/order", wk, _safe_div(dde_sum, orders))
+                set_weekly("PPM%", wk, 100 * _safe_div(ppm_num, wm_sub))
+
+            cur.execute(sql["sessions"])
+            for row in cur.fetchall():
+                wk, ftu_s, ftu_o, ret_s, ret_o = row
+                set_weekly("Ftu Sessions", wk, ftu_s / 1000)
+                set_weekly("Ftu Conversion", wk, 100 * _safe_div(ftu_o, ftu_s))
+                set_weekly("Returning User Sessions", wk, ret_s / 1000)
+                set_weekly("Returning User Conversion", wk, 100 * _safe_div(ret_o, ret_s))
+
+            cur.execute(sql["mart"])
+            for row in cur.fetchall():
+                (wk, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d) = row
+                set_weekly("Weighted Availability", wk, 100 * _safe_div(wa_n, wa_d))
+                set_weekly("KVI & Promo WA%", wk, 100 * _safe_div(kvi_n, kvi_d))
+                set_weekly("POFR%", wk, 100 * _safe_div(pofr_n, pofr_d))
+                set_weekly("Under 45min >", wk, 100 * _safe_div(u45_n, u45_d))
+
+            cur.execute(sql["shrink"])
+            for row in cur.fetchall():
+                wk, shrink_share = row
+                set_weekly(
+                    "Shrink/DDE FEE",
+                    wk,
+                    float(shrink_share) if shrink_share is not None else None,
+                )
+
+    return {
+        "weekKeys": week_keys,
+        "weekLabels": week_labels,
+        "lastCompletedWeekStart": anchor.isoformat(),
+        "dataAsOf": as_of.isoformat(),
+        "metrics": list(WEEKLY_OKR_METRICS),
+        "actuals": data,
+    }
+
+
+def write_weekly_cache(payload: dict[str, Any]) -> None:
+    WEEKLY_CACHE_JSON.parent.mkdir(parents=True, exist_ok=True)
+    WEEKLY_CACHE_JSON.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+
+
+def load_weekly_cache() -> dict[str, Any] | None:
+    if WEEKLY_CACHE_JSON.is_file():
+        return json.loads(WEEKLY_CACHE_JSON.read_text(encoding="utf-8"))
+    return None
+
+
 def _safe_div(num: float | None, den: float | None) -> float | None:
     if num is None or den in (None, 0):
         return None
@@ -1399,6 +1601,7 @@ def build_html(
     vp_check: dict[str, list[float | None]] | None = None,
     shrink_check: dict[str, list[float | None]] | None = None,
     maintenance_source: str = "snowflake",
+    weekly: dict[str, Any] | None = None,
 ) -> str:
     match_rows = []
     for name in VALIDATED_TABLE_METRICS:
@@ -1702,16 +1905,18 @@ def build_html(
     <p class="meta"><strong>% Bad Goods Rating:</strong> {GOLDEN_BAD_GOODS_NOTE} · <a href="{_LOOKER_GOLDEN_STORE_OPS}" target="_blank" rel="noopener">Golden Store Ops 106616</a> · שדה Looker: <em>Bad Goods Rating %</em> (<code>bad_goods_rating</code>).</p>
   </div>
 
-  <script>window.OKR_VALIDATION = {json.dumps({"snowflake": snow, "looker": LOOKER, "sources": METRIC_SOURCE, "looker_links": {k: {"label": v[0], "url": v[1]} for k, v in LOOKER_LINKS.items()}, "user_verified": sorted(USER_VERIFIED), "essi_session_note": ESSI_SESSION_NOTE, "essi_session_slack": ESSI_SESSION_SLACK, "ofl_cross_check": ofl_check, "ofl_ue_note": OFL_UE_NOTE, "vp_cross_check": vp_check, "ibm_vp_note": IBM_VP_NOTE, "vp_ue_note": VP_UE_NOTE, "shrink_cross_check": shrink_check, "golden_shrink_note": GOLDEN_SHRINK_NOTE}, ensure_ascii=False)};</script>
+  <script>window.OKR_VALIDATION = {json.dumps({"snowflake": snow, "looker": LOOKER, "sources": METRIC_SOURCE, "looker_links": {k: {"label": v[0], "url": v[1]} for k, v in LOOKER_LINKS.items()}, "user_verified": sorted(USER_VERIFIED), "essi_session_note": ESSI_SESSION_NOTE, "essi_session_slack": ESSI_SESSION_SLACK, "ofl_cross_check": ofl_check, "ofl_ue_note": OFL_UE_NOTE, "vp_cross_check": vp_check, "ibm_vp_note": IBM_VP_NOTE, "vp_ue_note": VP_UE_NOTE, "shrink_cross_check": shrink_check, "golden_shrink_note": GOLDEN_SHRINK_NOTE, "weekly": weekly}, ensure_ascii=False)};</script>
 </body>
 </html>"""
 
 
 def main() -> None:
     snow, ofl_check, vp_check, shrink_check, maintenance_source = fetch_metrics()
+    weekly = fetch_metrics_weekly()
+    write_weekly_cache(weekly)
     OUT_HTML.parent.mkdir(parents=True, exist_ok=True)
     OUT_HTML.write_text(
-        build_html(snow, ofl_check, vp_check, shrink_check, maintenance_source),
+        build_html(snow, ofl_check, vp_check, shrink_check, maintenance_source, weekly),
         encoding="utf-8",
     )
     print("Wrote", OUT_HTML.name, "to auto_outputs/")

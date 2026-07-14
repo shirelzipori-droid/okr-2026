@@ -2,7 +2,7 @@
 
 Sheet 1: Actual values compared to targets (red when target missed).
 Sheet 2: Editable targets (auto-saved in browser localStorage).
-Sheet 3: מדדים לבדיקה (Snowflake + השוואת Looker).
+Sheet 3: For review (Snowflake + Looker comparison).
 
 Usage:
   python build_okr_2026_interactive_dashboard.py
@@ -45,7 +45,11 @@ from okr_2026_validation import (
     SOLD_FROM_SELECTION_PROMOTED_NAME,
     SOLD_FROM_SELECTION_VARIANTS,
     USER_VERIFIED,
+    WEEKLY_OKR_METRICS,
     fetch_metrics,
+    fetch_metrics_weekly,
+    load_weekly_cache,
+    write_weekly_cache,
 )
 
 # English copy for the interactive dashboard UI (embedded payload + templates).
@@ -70,6 +74,7 @@ DASHBOARD_ESSI_SVENJA_NOTE = (
 )
 DASHBOARD_ESSI_SESSION = {
     **ESSI_SESSION_PAYLOAD,
+    "note": ESSI_SESSION_NOTE,
     "noteHe": ESSI_SESSION_NOTE,
     "svenjaNote": DASHBOARD_ESSI_SVENJA_NOTE,
     "kpiDeprecatedLabel": (
@@ -83,6 +88,22 @@ DASHBOARD_MAINTENANCE_REVIEW = {
     **MAINTENANCE_REVIEW_PAYLOAD,
     "noteHe": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
 }
+
+_NOT_CERTIFIED_BADGE_EN = {
+    "לא מאושר": "Not approved",
+    "! לא מאושר": "! Not approved",
+}
+
+
+def _dashboard_not_certified_explores() -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for item in LOOKER_EXPLORE_NOT_CERTIFIED:
+        row = dict(item)
+        badge = row.get("badge", "")
+        row["badge"] = _NOT_CERTIFIED_BADGE_EN.get(badge, badge)
+        rows.append(row)
+    return rows
+
 
 ROOT = Path(__file__).resolve().parent
 OUT_HTML = ROOT / "auto_outputs" / "okr_2026_interactive_dashboard.html"
@@ -179,6 +200,21 @@ METRIC_FORMAT: dict[str, str] = {
 }
 
 
+
+def _load_cached_weekly() -> dict | None:
+    cached = load_weekly_cache()
+    if cached:
+        return cached
+    if not VALIDATION_HTML.is_file():
+        return None
+    text = VALIDATION_HTML.read_text(encoding="utf-8")
+    match = re.search(r"window\.OKR_VALIDATION = (\{.*?\});</script>", text, re.S)
+    if not match:
+        return None
+    payload = json.loads(match.group(1))
+    return payload.get("weekly")
+
+
 def _default_format(name: str) -> str:
     if name in METRIC_FORMAT:
         return METRIC_FORMAT[name]
@@ -194,7 +230,10 @@ def _pad_series(vals: list[float | None] | None, n: int = DASHBOARD_MONTH_COUNT)
     return src + [None] * max(0, n - len(src))
 
 
-def _build_payload(actuals_snow: dict[str, list[float | None]]) -> dict:
+def _build_payload(
+    actuals_snow: dict[str, list[float | None]],
+    weekly_payload: dict | None = None,
+) -> dict:
     actuals: dict[str, list[float | None]] = {}
     for name in ALL_METRIC_NAMES:
         if name in actuals_snow:
@@ -254,7 +293,7 @@ def _build_payload(actuals_snow: dict[str, list[float | None]]) -> dict:
         "soldSelectionInsertAfter": "KVI & Promo WA%",
         "soldSelectionInsertAfterLeader": "Area Product Selection",
         "approvedLookerExplores": APPROVED_LOOKER_EXPLORES,
-        "notCertifiedLookerExplores": LOOKER_EXPLORE_NOT_CERTIFIED,
+        "notCertifiedLookerExplores": _dashboard_not_certified_explores(),
         "reviewMetrics": list(REVIEW_TAB_METRICS),
         "reviewNote": DASHBOARD_SESSION_REVIEW_NOTE,
         "maintenanceReviewNote": DASHBOARD_MAINTENANCE_REVIEW_NOTE,
@@ -286,6 +325,13 @@ def _build_payload(actuals_snow: dict[str, list[float | None]]) -> dict:
             "owners": STORAGE_OWNERS,
             "soldChoice": STORAGE_SOLD_CHOICE,
         },
+        "weeklyMetrics": list(WEEKLY_OKR_METRICS),
+        "weekKeys": (weekly_payload or {}).get("weekKeys", []),
+        "weekLabels": (weekly_payload or {}).get("weekLabels", []),
+        "actualsWeekly": (weekly_payload or {}).get("actuals", {}),
+        "lastCompletedWeekStart": (weekly_payload or {}).get("lastCompletedWeekStart", ""),
+        "weeklyDataAsOf": (weekly_payload or {}).get("dataAsOf", ""),
+        "weeklyViewCount": 6,
     }
 
 
@@ -652,6 +698,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       display: block; font-size: 9px; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.04em; color: var(--wolt-cyan-dark); margin-bottom: 2px;
     }
+    .cell-week-mini {
+      padding: 6px 10px; border-radius: var(--radius-sm); text-align: center;
+      background: #f0f9fc; border: 1.5px dashed var(--border);
+      font-size: 11px; font-weight: 700; color: var(--muted); line-height: 1.3;
+    }
+    .cell-week-mini .lbl {
+      display: block; font-size: 9px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--muted); margin-bottom: 2px;
+    }
     .actual-inline-input {
       width: 100%; min-width: 72px; max-width: 110px;
       background: #fff; border: 1px solid var(--border); border-radius: 12px;
@@ -709,6 +764,36 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .essi-sources th { background: #dcfce7; color: #166534; }
     .essi-card a { color: var(--wolt-cyan-dark); }
     .essi-meta { font-size: 12px; color: #166534; margin: 8px 0 0; line-height: 1.5; }
+    .weekly-row-actions { margin-top: 8px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+    .btn-weekly {
+      font-family: var(--font-ui);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--wolt-cyan-dark);
+      background: rgba(255, 255, 255, 0.9);
+      color: var(--wolt-cyan-deep);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-weekly:hover { background: var(--wolt-cyan-pale); }
+    .btn-weekly.active {
+      background: linear-gradient(180deg, var(--wolt-cyan) 0%, var(--wolt-cyan-dark) 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(0, 149, 179, 0.35);
+    }
+    .weekly-unavailable {
+      font-size: 10px;
+      color: var(--muted);
+      margin-top: 8px;
+      font-style: italic;
+    }
+    tr.row-weekly-mode td:not(.leader-col):not(.partner-col):not(.metric-cell) {
+      background: rgba(240, 249, 252, 0.55);
+    }
     footer { margin-top: 20px; font-size: 12px; color: var(--muted); line-height: 1.6; }
   </style>
 </head>
@@ -845,6 +930,77 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     let storageOk = true;
     let saveTimer = null;
     let activeTargetInput = null;
+    const weeklyModeMetrics = new Set();
+
+    function hasWeeklyView(metric) {
+      return (CFG.weeklyMetrics || []).includes(metric);
+    }
+
+    function isWeeklyMode(metric) {
+      return weeklyModeMetrics.has(metric) && hasWeeklyView(metric);
+    }
+
+    function weekIndex(weekKey) {
+      return (CFG.weekKeys || []).indexOf(weekKey);
+    }
+
+    function weekLabelForKey(weekKey) {
+      const i = weekIndex(weekKey);
+      return i >= 0 ? (CFG.weekLabels[i] || weekKey) : weekKey;
+    }
+
+    function addWeeksIso(iso, deltaWeeks) {
+      const [y, m, d] = iso.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      dt.setUTCDate(dt.getUTCDate() + deltaWeeks * 7);
+      return dt.toISOString().slice(0, 10);
+    }
+
+    /** Last n completed weeks ending at lastCompletedWeekStart (oldest → newest). */
+    function trailingWeekKeys(n) {
+      const count = n || CFG.weeklyViewCount || 6;
+      const anchor = CFG.lastCompletedWeekStart;
+      if (!anchor || count <= 0) return [];
+      const out = [];
+      for (let i = count - 1; i >= 0; i--) {
+        out.push(addWeeksIso(anchor, -i));
+      }
+      return out;
+    }
+
+    function weekPeriodsForView() {
+      return trailingWeekKeys(CFG.weeklyViewCount || 6);
+    }
+
+    function getWeeklyActual(metric, weekKey) {
+      const series = (CFG.actualsWeekly || {})[metric];
+      if (!series) return null;
+      const i = weekIndex(weekKey);
+      if (i < 0) return null;
+      return series[i];
+    }
+
+    function weeklyToggleHtml(metric) {
+      if (!hasWeeklyView(metric)) {
+        return `<span class="weekly-unavailable">No weekly view</span>`;
+      }
+      if (isWeeklyMode(metric)) {
+        return `<button type="button" class="btn-weekly active" data-weekly-toggle="${escAttr(metric)}">MONTHLY</button>`;
+      }
+      return `<button type="button" class="btn-weekly" data-weekly-toggle="${escAttr(metric)}">WEEKLY</button>`;
+    }
+
+    function bindWeeklyToggles(root) {
+      root.querySelectorAll("[data-weekly-toggle]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const m = btn.dataset.weeklyToggle;
+          if (weeklyModeMetrics.has(m)) weeklyModeMetrics.delete(m);
+          else weeklyModeMetrics.add(m);
+          renderPerformance();
+          renderLeader();
+        });
+      });
+    }
 
     function loadJson(key, fallback) {
       try {
@@ -1380,7 +1536,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (lk.url) {
         link = `<a class="src-link" href="${escAttr(lk.url)}" target="_blank" rel="noopener">${linkIcon()} ${escHtml(lk.label || "Source")}</a>`;
       }
-      return `<div class="metric-name">${escHtml(metric)}</div>` + link;
+      return `<div class="metric-name">${escHtml(metric)}</div>` + link
+        + `<div class="weekly-row-actions">${weeklyToggleHtml(metric)}</div>`;
     }
 
     function renderEssiCard() {
@@ -1401,7 +1558,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         + `<td><a href="${escAttr(e.kpiDeprecatedUrl)}" target="_blank" rel="noopener">WM Metrics (legacy)</a></td></tr>`
         + `</tbody></table>`
         + `<p class="essi-meta"><strong>Why in For review?</strong> ${escHtml(e.svenjaNote || "")}</p>`
-        + `<p class="essi-meta">${escHtml(e.noteHe || e.note || "")}</p>`;
+        + `<p class="essi-meta">${escHtml(e.note || e.noteHe || "")}</p>`;
     }
 
     function renderMaintenanceCard() {
@@ -1522,6 +1679,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function renderMetricRows(metrics, tableRootId) {
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const anyWeekly = metrics.some(m => isWeeklyMode(m));
+      const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
       const metricIdxMap = {};
       editMetricsList.forEach((m, i) => { metricIdxMap[m] = i; });
       return metrics.map(metric => {
@@ -1529,7 +1688,34 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         const wf = (CFG.metricWorkflow || {})[metric] || "auto";
         const mIdx = metricIdxMap[metric];
         const manual = isManualMetric(metric);
-        const cells = months.map(monthKey => {
+        const weeklyRow = isWeeklyMode(metric);
+        const cells = anyWeekly
+          ? weekPeriods.map(weekKey => {
+              if (weeklyRow) {
+                const actual = getWeeklyActual(metric, weekKey);
+                if (actual === null) {
+                  return `<td><div class="cell-actual no-actual">—</div></td>`;
+                }
+                return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">`
+                  + `<div class="actual-val">${formatValue(metric, actual)}</div>`
+                  + `</div></div></td>`;
+              }
+              const monthKey = weekKey.slice(0, 7);
+              const idx = monthIndex(monthKey);
+              const actual = getActual(metric, idx);
+              const target = getTarget(metric, monthKey);
+              if (actual === null && !manual) {
+                return `<td><div class="cell-actual no-actual">—</div></td>`;
+              }
+              const met = meetsTarget(actual, target, metric);
+              let cls = "cell-actual";
+              if (target === null) cls += " no-target";
+              else { cls += met ? " hit" : " miss"; cls += " has-target"; }
+              return `<td><div class="perf-cell-wrap"><div class="${cls}">`
+                + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
+                + `</div></div></td>`;
+            }).join("")
+          : months.map(monthKey => {
           const idx = monthIndex(monthKey);
           const actual = getActual(metric, idx);
           const target = getTarget(metric, monthKey);
@@ -1572,20 +1758,30 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         }).join("");
         let rowCls = manual ? "manual-row" : "";
         if (wf === "cancelled") rowCls = (rowCls ? rowCls + " " : "") + "row-cancelled";
+        if (weeklyRow) rowCls = (rowCls ? rowCls + " " : "") + "row-weekly-mode";
         const rowClsAttr = rowCls ? ` class="${rowCls}"` : "";
         return `<tr${rowClsAttr} data-metric="${escAttr(metric)}"><td class="leader-col">${o.leader || "—"}</td><td class="partner-col">${o.partner || "—"}</td><td class="metric-cell">${metricCellHtml(metric)}</td>${cells}</tr>`;
       }).join("");
     }
 
-    function renderPerformanceTableHead(tableId) {
+    function tableUsesWeeklyHeaders(metrics) {
+      return metrics.some(m => isWeeklyMode(m));
+    }
+
+    function renderPerformanceTableHead(tableId, metrics) {
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
       const thead = document.querySelector(`#${tableId} thead`);
       if (!thead) return;
+      const anyWeekly = tableUsesWeeklyHeaders(metrics || []);
+      const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
-        + months.map(k => {
-          const i = monthIndex(k);
-          return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Actual</span></th>`;
-        }).join("") + "</tr>";
+        + (anyWeekly
+          ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week</span></th>`).join("")
+          : months.map(k => {
+              const i = monthIndex(k);
+              return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Actual</span></th>`;
+            }).join("")
+        ) + "</tr>";
     }
 
     function renderMainLeaderChips() {
@@ -1634,18 +1830,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function renderLeader() {
-      renderPerformanceTableHead("leaderTable");
+      const metrics = filteredLeaderMetrics();
+      renderPerformanceTableHead("leaderTable", metrics);
       const tbody = document.querySelector("#leaderTable tbody");
       if (!tbody) return;
-      tbody.innerHTML = renderMetricRows(filteredLeaderMetrics(), "leaderTable");
+      tbody.innerHTML = renderMetricRows(metrics, "leaderTable");
       bindPerformanceActualInputs(tbody);
+      bindWeeklyToggles(tbody);
     }
 
     function renderPerformance() {
-      renderPerformanceTableHead("performanceTable");
+      const metrics = filteredMainMetrics();
+      renderPerformanceTableHead("performanceTable", metrics);
       const tbody = document.querySelector("#performanceTable tbody");
-      tbody.innerHTML = renderMetricRows(filteredMainMetrics(), "performanceTable");
+      tbody.innerHTML = renderMetricRows(metrics, "performanceTable");
       bindPerformanceActualInputs(tbody);
+      bindWeeklyToggles(tbody);
     }
 
     function bindValueInput(inp) {
@@ -1776,10 +1976,13 @@ def main() -> None:
         actuals = _load_cached_metrics()
         if actuals is None:
             raise SystemExit("No cached metrics — run okr_2026_validation.py first.")
+        weekly = _load_cached_weekly()
     else:
         actuals, _ofl_check, _vp_check, _shrink_check, _maint = fetch_metrics()
+        weekly = fetch_metrics_weekly()
+        write_weekly_cache(weekly)
 
-    payload = _build_payload(actuals)
+    payload = _build_payload(actuals, weekly)
     html = build_html(payload)
     OUT_HTML.parent.mkdir(parents=True, exist_ok=True)
     OUT_HTML.write_text(html, encoding="utf-8")
