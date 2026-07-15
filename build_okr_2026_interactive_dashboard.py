@@ -102,6 +102,10 @@ MONTH_LABELS = [
     "Jan 26", "Feb 26", "Mar 26", "Apr 26", "May 26", "Jun 26",
     "Jul 26", "Aug 26", "Sep 26", "Oct 26", "Nov 26", "Dec 26",
 ]
+# Default period filter — months with refreshed actuals (update when scope extends).
+DEFAULT_SELECTED_MONTH_KEYS: tuple[str, ...] = (
+    "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+)
 STORAGE_TARGETS = "okr2026_targets_v1"
 STORAGE_ACTUALS = "okr2026_actuals_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
@@ -225,6 +229,22 @@ def _pad_series(vals: list[float | None] | None, n: int = DASHBOARD_MONTH_COUNT)
     return src + [None] * max(0, n - len(src))
 
 
+def _default_selected_month_keys(
+    actuals_snow: dict[str, list[float | None]],
+) -> list[str]:
+    """Jan through the last month with any Snowflake actual (e.g. Jan–Jun until July closes)."""
+    last_with_data = -1
+    for i, month_key in enumerate(MONTH_KEYS):
+        if any(
+            i < len(series) and series[i] is not None
+            for series in actuals_snow.values()
+        ):
+            last_with_data = i
+    if last_with_data < 0:
+        return [MONTH_KEYS[0]]
+    return MONTH_KEYS[: last_with_data + 1]
+
+
 def _build_payload(
     actuals_snow: dict[str, list[float | None]],
     weekly_payload: dict | None = None,
@@ -279,6 +299,7 @@ def _build_payload(
         SOLD_FROM_SELECTION_PROMOTED_NAME: {"leader": "CAT & Content", "partner": ""},
     }
     default_targets = build_default_targets_flat(MONTH_KEYS)
+    default_selected_months = _default_selected_month_keys(actuals_snow)
     return {
         "mainMetrics": main_metrics,
         "leaderMetrics": leader_metrics,
@@ -308,6 +329,7 @@ def _build_payload(
         },
         "monthKeys": MONTH_KEYS,
         "monthLabels": MONTH_LABELS,
+        "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
         "defaultTargetsNote": "OKR 2026 target spreadsheet · Jan–Dec 2026",
         "actuals": actuals,
@@ -935,7 +957,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
   <script>
     const CFG = __PAYLOAD__;
 
-    let selectedMonths = new Set(CFG.monthKeys);
+    let selectedMonths = new Set(CFG.defaultSelectedMonths || CFG.monthKeys);
     let selectedMainLeader = null;
     let selectedLeader = null;
     let targets = {};  /* user overrides only — defaults in CFG.defaultTargets */
@@ -2018,7 +2040,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview(); renderToDelete();
     });
     document.getElementById("btnClearPeriods").addEventListener("click", () => {
-      selectedMonths = new Set([CFG.monthKeys[CFG.monthKeys.length - 1]]);
+      const defaults = CFG.defaultSelectedMonths || CFG.monthKeys;
+      selectedMonths = new Set([defaults[defaults.length - 1]]);
       renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview(); renderToDelete();
     });
 
