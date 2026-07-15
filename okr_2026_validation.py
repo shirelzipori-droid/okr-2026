@@ -281,6 +281,11 @@ _LOOKER_KVI_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
     "?qid=SNa5FE1A71a6WUqTJ74PCv&origin_space=27423&toggle=vis"
 )
+# Shrink/DDE FEE — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
+_LOOKER_SHRINK_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=eT3RRh18WkOQdr8rXiMofo&origin_space=27423&toggle=fil"
+)
 # OFL / order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
 _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
@@ -654,7 +659,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Returning Clients": ("Golden Growth — Returning Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Client Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "PPM%": ("WM Venue Metrics Aggregated — PPM (ISR)", _LOOKER_PPM_AGGREGATED),
-    "Shrink/DDE FEE": ("Golden SCM — Shrink/DDE FEE (106617)", _LOOKER_GOLDEN_SCM),
+    "Shrink/DDE FEE": ("WM Venue Metrics Aggregated — Shrink/DDE FEE (ISR)", _LOOKER_SHRINK_AGGREGATED),
     "OFL / order (ILS)": ("WM Unit Economics — OFL (ISR)", _LOOKER_OFL_WM_UE),
     "Maintenance costs": ("NetSuite Mgmt PL — 87310 (reconciliation)", ""),
     "VP%": ("IBM — planning_metrics_actuals", ""),
