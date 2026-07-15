@@ -448,12 +448,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       pointer-events: none;
     }
     .brand-top {
-      display: flex;
+      display: grid;
+      grid-template-columns: auto 1fr;
       align-items: center;
       gap: 22px;
-      flex-wrap: wrap;
       position: relative;
       z-index: 1;
+      min-height: 76px;
     }
     .wm-logo {
       flex-shrink: 0;
@@ -464,14 +465,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       overflow: hidden;
       box-shadow: 0 10px 32px rgba(0, 60, 80, 0.28);
       line-height: 0;
+      height: 76px;
     }
     .wm-logo-img {
       display: block;
-      height: 54px;
+      height: 100%;
       width: auto;
+      max-width: 220px;
       object-fit: contain;
     }
-    .brand-text { flex: 1; min-width: 200px; }
+    .brand-text {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      min-width: 240px;
+      pointer-events: none;
+    }
     .brand-text h1 {
       margin: 0 0 4px;
       font-family: var(--font-ui);
@@ -486,20 +497,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       font-size: 14px;
       margin: 0;
       font-weight: 500;
-    }
-    .brand-badge {
-      margin-left: auto;
-      background: rgba(255, 255, 255, 0.16);
-      backdrop-filter: blur(10px);
-      padding: 10px 18px;
-      border-radius: var(--radius-pill);
-      font-family: var(--font-ui);
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #fff;
-      border: 1px solid rgba(255, 255, 255, 0.32);
     }
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
@@ -829,7 +826,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <h1>OKR 2026</h1>
           <p class="subtitle">ISR · 1P Local · Main KPIs · Jan–Dec 2026</p>
         </div>
-        <div class="brand-badge">Wolt Market ISR</div>
       </div>
     </header>
 
