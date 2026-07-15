@@ -542,6 +542,12 @@
     </div>
 
     <div class="panel hidden" id="panelEdit">
+      <div class="leader-toolbar">
+        <div>
+          <label>Filter by Leader</label>
+          <div class="leader-chips" id="editLeaderChips"></div>
+        </div>
+      </div>
       <div class="panel-head">
         <h2>Target — goals only</h2>
         <span style="font-size:12px;color:var(--muted);">Enter a target per month · auto-saved</span>
@@ -598,6 +604,7 @@
     let selectedMonths = new Set(CFG.defaultSelectedMonths || CFG.monthKeys);
     let selectedMainLeader = null;
     let selectedLeader = null;
+    let selectedEditLeader = null;
     let targets = {};  /* user overrides only — defaults in CFG.defaultTargets */
     let actualOverrides = {};
     let owners = {};
@@ -793,6 +800,7 @@
       renderMainLeaderChips();
       renderPerformance();
       renderLeader();
+      renderEditLeaderChips();
       renderEdit();
       renderReview();
       updateHintBanner();
@@ -917,6 +925,14 @@
       });
       if (selectedLeader) {
         list = list.filter(m => leaderMatchesFilter(m, selectedLeader));
+      }
+      return list;
+    }
+
+    function filteredEditMetrics() {
+      let list = editMetricsList.slice();
+      if (selectedEditLeader) {
+        list = list.filter(m => leaderMatchesFilter(m, selectedEditLeader));
       }
       return list;
     }
@@ -1568,6 +1584,29 @@
       });
     }
 
+    function renderEditLeaderChips() {
+      const el = document.getElementById("editLeaderChips");
+      if (!el) return;
+      const leaders = CFG.leaderOrder || [];
+      const all = editMetricsList;
+      let html = `<button type="button" class="chip${selectedEditLeader === null ? " active" : ""}" data-edit-leader="">All (${all.length})</button>`;
+      html += leaders.map(l => {
+        const count = all.filter(m => leaderMatchesFilter(m, l)).length;
+        const active = selectedEditLeader === l ? " active" : "";
+        const disabled = count === 0 ? " disabled" : "";
+        return `<button type="button" class="chip${active}${disabled}" data-edit-leader="${escAttr(l)}"${count === 0 ? " disabled" : ""}>${escHtml(l)} (${count})</button>`;
+      }).join("");
+      el.innerHTML = html;
+      el.querySelectorAll(".chip:not([disabled])").forEach(chip => {
+        chip.addEventListener("click", () => {
+          const v = chip.dataset.editLeader;
+          selectedEditLeader = v || null;
+          renderEditLeaderChips();
+          renderEdit();
+        });
+      });
+    }
+
     function renderLeader() {
       const metrics = filteredLeaderMetrics();
       renderPerformanceTableHead("leaderTable", metrics);
@@ -1622,7 +1661,8 @@
           return `<th class="month-col">${lbl}<span class="edit-sub">Target</span></th>`;
         }).join("") + "</tr>";
 
-      tbody.innerHTML = editMetricsList.map((metric, mIdx) => {
+      tbody.innerHTML = filteredEditMetrics().map((metric) => {
+        const mIdx = editMetricsList.indexOf(metric);
         const rowCls = isManualMetric(metric) ? "manual-row" : "";
         const cells = months.map(monthKey => {
           const tgt = getTarget(metric, monthKey);
@@ -1667,7 +1707,7 @@
         document.getElementById("panelToDelete").classList.toggle("hidden", id !== "todelete");
         if (id === "performance") { renderMainLeaderChips(); renderPerformance(); }
         if (id === "leader") { renderLeaderChips(); renderLeader(); }
-        if (id === "edit") renderEdit();
+        if (id === "edit") { renderEditLeaderChips(); renderEdit(); }
         if (id === "review") renderReview();
         if (id === "todelete") renderToDelete();
       });
@@ -1675,17 +1715,18 @@
 
     document.getElementById("btnAllPeriods").addEventListener("click", () => {
       selectedMonths = new Set(CFG.monthKeys);
-      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview(); renderToDelete();
+      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEditLeaderChips(); renderEdit(); renderReview(); renderToDelete();
     });
     document.getElementById("btnClearPeriods").addEventListener("click", () => {
       const defaults = CFG.defaultSelectedMonths || CFG.monthKeys;
       selectedMonths = new Set([defaults[defaults.length - 1]]);
-      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEdit(); renderReview(); renderToDelete();
+      renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEditLeaderChips(); renderEdit(); renderReview(); renderToDelete();
     });
 
     renderPeriodChips();
     renderMainLeaderChips();
     renderLeaderChips();
+    renderEditLeaderChips();
     renderPerformance();
     renderLeader();
     renderEdit();
