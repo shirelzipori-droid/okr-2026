@@ -284,7 +284,7 @@ _LOOKER_KVI_AGGREGATED = (
 # OFL / order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
 _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
-    "?qid=KGcLGaO64nvCDney8ktgVl&origin_space=4187&toggle=fil,vis"
+    "?qid=4YWysbemvlUOTZiL6M9poo&origin_space=4187&toggle=fil,vis"
 )
 # Under 45min — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
 _LOOKER_UNDER_45_AGGREGATED = (
