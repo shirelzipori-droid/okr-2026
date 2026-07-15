@@ -46,6 +46,7 @@ from okr_2026_validation import (
     SOLD_FROM_SELECTION_VARIANTS,
     TO_DELETE_TAB_METRICS,
     USER_VERIFIED,
+    WEEKLY_LEADER_METRICS,
     WEEKLY_OKR_METRICS,
     WEEKLY_REVIEW_METRICS,
     fetch_metrics,
@@ -327,6 +328,7 @@ def _build_payload(
         },
         "weeklyMetrics": list(WEEKLY_OKR_METRICS),
         "weeklyReviewMetrics": list(WEEKLY_REVIEW_METRICS),
+        "weeklyLeaderMetrics": list(WEEKLY_LEADER_METRICS),
         "weekKeys": (weekly_payload or {}).get("weekKeys", []),
         "weekLabels": (weekly_payload or {}).get("weekLabels", []),
         "actualsWeekly": (weekly_payload or {}).get("actuals", {}),
@@ -946,7 +948,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function hasWeeklyView(metric) {
       return (CFG.weeklyMetrics || []).includes(metric)
-        || (CFG.weeklyReviewMetrics || []).includes(metric);
+        || (CFG.weeklyReviewMetrics || []).includes(metric)
+        || (CFG.weeklyLeaderMetrics || []).includes(metric);
     }
 
     function isWeeklyMode(metric) {

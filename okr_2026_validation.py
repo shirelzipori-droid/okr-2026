@@ -1190,7 +1190,19 @@ WEEKLY_REVIEW_METRICS: tuple[str, ...] = (
     "Sold from selection — sold_from_product_selection_perc",
 )
 
-ALL_WEEKLY_METRICS: tuple[str, ...] = WEEKLY_OKR_METRICS + WEEKLY_REVIEW_METRICS
+# Weekly drill-down on KPI by Leader tab.
+WEEKLY_LEADER_METRICS: tuple[str, ...] = (
+    "Avg Units per Order",
+    "Penetration Rate",
+    "IDQ",
+    "VSL",
+    "UP-TIME >",
+    "% Bad Goods Rating",
+)
+
+ALL_WEEKLY_METRICS: tuple[str, ...] = (
+    WEEKLY_OKR_METRICS + WEEKLY_REVIEW_METRICS + WEEKLY_LEADER_METRICS
+)
 
 WEEKLY_CACHE_JSON = ROOT / "auto_outputs" / "okr_2026_weekly_cache.json"
 WEEKLY_RANGE_START = date(2026, 1, 5)
@@ -1303,11 +1315,50 @@ SELECT METRIC_DATE AS wk,
   SUM(PERFECT_ORDER_FULFILLMENT_RATIO_DENOMINATOR) AS pofr_den,
   SUM(DELIVERED_UNDER_45_MINUTES_ORDERS_COUNT) AS u45_num,
   SUM(TOTAL_ORDERS_COUNT) AS u45_den,
+  SUM(VENUE_BAD_GOODS_RATING_ORDERS_COUNT) AS bad_goods_num,
+  SUM(WEIGHTED_UPTIME_RATIO_NUMERATOR) AS up_num,
+  SUM(WEIGHTED_UPTIME_RATIO_DENOMINATOR) AS up_den,
   100 * (SUM(TOTAL_SUBTOTAL_VAT0_LOCAL_SUM) - ABS(SUM(TOTAL_COST_OF_INVENTORY_COGS)))
     / NULLIF(SUM(TOTAL_SUBTOTAL_VAT0_LOCAL_SUM), 0) AS ppm_pct
 FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_WEEKLY
 WHERE VENUE_COUNTRY = 'ISR'
   AND RETAIL_PLATFORM_VENUE_NAME LIKE 'Wolt Market |%'
+  AND METRIC_DATE >= '{start}'
+  AND METRIC_DATE < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+        "growth": f"""
+SELECT DATE::DATE AS wk,
+  TOTAL_ORDERS,
+  TOTAL_UNITS,
+  PENETRATION_RATE
+FROM PRODUCTION.PRESENTATION.WOLT_MARKET_METRICS
+WHERE PERIOD = 'week'
+  AND COUNTRY = 'ISR'
+  AND AREA = 'country'
+  AND VENUE_NAME IS NULL
+  AND DATE >= '{start}'
+  AND DATE < '{sql_end}'
+ORDER BY 1
+""",
+        "idq": f"""
+SELECT METRIC_DATE AS wk,
+  SUM(WM_IDQ_NUMERATOR) AS idq_num,
+  SUM(WM_IDQ_DENOMINATOR) AS idq_den
+FROM PRODUCTION.MART.RETAIL_METRICS_OVERVIEW_WEEKLY
+WHERE VENUE_COUNTRY = 'ISR'
+  AND METRIC_DATE >= '{start}'
+  AND METRIC_DATE < '{sql_end}'
+GROUP BY 1
+ORDER BY 1
+""",
+        "vsl": f"""
+SELECT METRIC_DATE AS wk,
+  SUM(VENDOR_SERVICE_LEVEL_NUM) AS vsl_num,
+  SUM(VENDOR_SERVICE_LEVEL_DENOM) AS vsl_den
+FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_WEEKLY
+WHERE VENUE_COUNTRY = 'ISR'
   AND METRIC_DATE >= '{start}'
   AND METRIC_DATE < '{sql_end}'
 GROUP BY 1
@@ -1392,7 +1443,21 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
 
             cur.execute(sql["mart"])
             for row in cur.fetchall():
-                (wk, wa_n, wa_d, kvi_n, kvi_d, pofr_n, pofr_d, u45_n, u45_d, ppm_pct) = row
+                (
+                    wk,
+                    wa_n,
+                    wa_d,
+                    kvi_n,
+                    kvi_d,
+                    pofr_n,
+                    pofr_d,
+                    u45_n,
+                    u45_d,
+                    bad_goods_n,
+                    up_n,
+                    up_d,
+                    ppm_pct,
+                ) = row
                 set_weekly("Weighted Availability", wk, 100 * _safe_div(wa_n, wa_d))
                 set_weekly("KVI & Promo WA%", wk, 100 * _safe_div(kvi_n, kvi_d))
                 set_weekly("POFR%", wk, 100 * _safe_div(pofr_n, pofr_d))
@@ -1402,6 +1467,36 @@ def fetch_metrics_weekly(as_of: date | None = None) -> dict[str, Any]:
                     wk,
                     float(ppm_pct) if ppm_pct is not None else None,
                 )
+                set_weekly(
+                    "% Bad Goods Rating",
+                    wk,
+                    100 * _safe_div(bad_goods_n, u45_d),
+                )
+                set_weekly("UP-TIME >", wk, 100 * _safe_div(up_n, up_d))
+
+            cur.execute(sql["growth"])
+            for row in cur.fetchall():
+                wk, orders, units, penetration = row
+                set_weekly(
+                    "Avg Units per Order",
+                    wk,
+                    _safe_div(units, orders),
+                )
+                set_weekly(
+                    "Penetration Rate",
+                    wk,
+                    float(penetration) * 100 if penetration is not None else None,
+                )
+
+            cur.execute(sql["idq"])
+            for row in cur.fetchall():
+                wk, idq_n, idq_d = row
+                set_weekly("IDQ", wk, 100 * _safe_div(idq_n, idq_d))
+
+            cur.execute(sql["vsl"])
+            for row in cur.fetchall():
+                wk, vsl_n, vsl_d = row
+                set_weekly("VSL", wk, 100 * _safe_div(vsl_n, vsl_d))
 
             cur.execute(sql["shrink"])
             for row in cur.fetchall():
