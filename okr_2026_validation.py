@@ -296,10 +296,10 @@ _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
     "?qid=4YWysbemvlUOTZiL6M9poo&origin_space=4187&toggle=fil,vis"
 )
-# DDE FEE/order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
-_LOOKER_DDE_WM_UE = (
-    "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
-    "?qid=umgJL9f10flfLTJvKfQ4AY&origin_space=4187&toggle=fil,vis"
+# DDE FEE/order — WM Venue Metrics Aggregated (Golden; ISR Wolt Market, country aggregate).
+_LOOKER_DDE_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=vB1OndsT6QGpkGetBcPvx3&origin_space=27423&toggle=fil"
 )
 # Under 45min — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
 _LOOKER_UNDER_45_AGGREGATED = (
@@ -426,10 +426,10 @@ OFL_WM_UE_NOTE = (
     "Wolt Market Unit Economics — ORDER_FULFILLMENT_LABOR_RECON ÷ purchases "
     "(ISR, IS_WOLT_MARKET; Snowflake: F_UNIT_ECONOMICS_RECONCILIATION)"
 )
-# DDE FEE/order — wolt_market_data/wolt_market_unit_economics (V ✅): Subtotal VAT0 per purchase.
+# DDE FEE/order — Golden / WM Venue Metrics Aggregated: Wolt Market Subtotal per Purchase.
 DDE_WM_UE_NOTE = (
-    "Wolt Market Unit Economics — Wolt Market Subtotal VAT0 ÷ purchases "
-    "(ISR, IS_WOLT_MARKET; Snowflake: F_UNIT_ECONOMICS_PURCHASES)"
+    "Golden / WM Venue Metrics Aggregated — Wolt Market Subtotal per Purchase "
+    "(ISR Wolt Market; Looker field: wolt_market_subtotal_per_purchase)"
 )
 # Back-compat alias for dashboard imports.
 OFL_UE_NOTE = OFL_WM_UE_NOTE
@@ -668,7 +668,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
 # Metric → (link label, URL) for the validated-metrics table.
 LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Orders": ("WM Venue Metrics Aggregated — Orders (ISR)", _LOOKER_ORDERS_AGGREGATED),
-    "DDE FEE/order": ("WM Unit Economics — DDE FEE/order (ISR)", _LOOKER_DDE_WM_UE),
+    "DDE FEE/order": ("WM Venue Metrics Aggregated — DDE FEE/order (Golden)", _LOOKER_DDE_AGGREGATED),
     "FTU": ("Golden Growth — FTU (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "FTU Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Clients": ("Golden Growth — Returning Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
