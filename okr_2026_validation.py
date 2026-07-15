@@ -266,6 +266,11 @@ _LOOKER_POFR_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
     "?qid=uYst64GAXk7COWPNzoLPTC&origin_space=27423&toggle=fil,vis"
 )
+# Orders — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
+_LOOKER_ORDERS_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=uKGgnIFDWzuio6Mywdjt8k&origin_space=27423&toggle=fil"
+)
 # PPM% — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
 _LOOKER_PPM_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
@@ -652,7 +657,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
 
 # Metric → (link label, URL) for the validated-metrics table.
 LOOKER_LINKS: dict[str, tuple[str, str]] = {
-    "Orders": ("UE — ISR WM (Look 47217)", _LOOKER_UE_ISR),
+    "Orders": ("WM Venue Metrics Aggregated — Orders (ISR)", _LOOKER_ORDERS_AGGREGATED),
     "DDE FEE/order": ("UE — ISR WM DDE (Look 47217)", _LOOKER_UE_ISR),
     "FTU": ("Golden Growth — FTU (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "FTU Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
