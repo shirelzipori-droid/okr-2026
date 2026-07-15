@@ -296,6 +296,11 @@ _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
     "?qid=4YWysbemvlUOTZiL6M9poo&origin_space=4187&toggle=fil,vis"
 )
+# DDE FEE/order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
+_LOOKER_DDE_WM_UE = (
+    "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
+    "?qid=umgJL9f10flfLTJvKfQ4AY&origin_space=4187&toggle=fil,vis"
+)
 # Under 45min — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
 _LOOKER_UNDER_45_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
@@ -420,6 +425,11 @@ IBM_VP_NOTE = (
 OFL_WM_UE_NOTE = (
     "Wolt Market Unit Economics — ORDER_FULFILLMENT_LABOR_RECON ÷ purchases "
     "(ISR, IS_WOLT_MARKET; Snowflake: F_UNIT_ECONOMICS_RECONCILIATION)"
+)
+# DDE FEE/order — wolt_market_data/wolt_market_unit_economics (V ✅): Subtotal VAT0 per purchase.
+DDE_WM_UE_NOTE = (
+    "Wolt Market Unit Economics — Wolt Market Subtotal VAT0 ÷ purchases "
+    "(ISR, IS_WOLT_MARKET; Snowflake: F_UNIT_ECONOMICS_PURCHASES)"
 )
 # Back-compat alias for dashboard imports.
 OFL_UE_NOTE = OFL_WM_UE_NOTE
@@ -658,7 +668,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
 # Metric → (link label, URL) for the validated-metrics table.
 LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Orders": ("WM Venue Metrics Aggregated — Orders (ISR)", _LOOKER_ORDERS_AGGREGATED),
-    "DDE FEE/order": ("UE — ISR WM DDE (Look 47217)", _LOOKER_UE_ISR),
+    "DDE FEE/order": ("WM Unit Economics — DDE FEE/order (ISR)", _LOOKER_DDE_WM_UE),
     "FTU": ("Golden Growth — FTU (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "FTU Conversion": ("Golden Growth — Client CVR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Returning Clients": ("Golden Growth — Returning Clients (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
@@ -2117,7 +2127,8 @@ def build_html(
 
     sources = f"""
     <ul>
-      <li><strong>Unit Economics</strong> — Orders, DDE (OFL &amp; VP — see cross-check below)</li>
+      <li><strong>Unit Economics</strong> — Orders (venue metrics aggregated); OFL &amp; VP — see cross-check below</li>
+      <li><strong>DDE FEE/order</strong> — {DDE_WM_UE_NOTE}</li>
       <li><strong>PPM%</strong> — {PPM_MART_NOTE} · Looker field: <em>Product Profit Margin %</em></li>
       <li><strong>OFL / order</strong> — {OFL_WM_UE_NOTE}</li>
       <li><strong>VP%</strong> — {IBM_VP_NOTE} (UE cross-check below)</li>

@@ -26,6 +26,7 @@ from okr_2026_validation import (
     GOLDEN_POFR_NOTE,
     GOLDEN_WA_NOTE,
     IBM_VP_NOTE,
+    DDE_WM_UE_NOTE,
     OFL_WM_UE_NOTE,
     PPM_MART_NOTE,
     VP_UE_NOTE,
@@ -87,7 +88,7 @@ SOURCE_BADGE: dict[str, tuple[str, str]] = {
 # Slack / SC evidence for managers (approved sources published in Slack).
 SC_APPROVAL: dict[str, str] = {
     "Orders": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217 (Ziwei)",
-    "DDE FEE/order": "✅ verified by user · #ask-finance-analytics · UE ISR Look 47217",
+    "DDE FEE/order": f"✅ verified by user · {DDE_WM_UE_NOTE}",
     "FTU": (
         f"✅ Golden Growth 106613 · {GOLDEN_GROWTH_CLIENTS_NOTE}"
     ),
