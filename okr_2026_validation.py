@@ -276,6 +276,11 @@ _LOOKER_WA_AGGREGATED = (
     "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
     "?qid=agdCClyokjNQnARdjFoiBx&origin_space=27423&toggle=vis"
 )
+# KVI & Promo WA — WM Venue Metrics Aggregated (ISR Wolt Market, country aggregate).
+_LOOKER_KVI_AGGREGATED = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=SNa5FE1A71a6WUqTJ74PCv&origin_space=27423&toggle=vis"
+)
 # OFL / order — Wolt Market Unit Economics (wolt_market_data; user verified V ✅).
 _LOOKER_OFL_WM_UE = (
     "https://looker.wolt.com/explore/wolt_market_data/wolt_market_unit_economics"
@@ -654,7 +659,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Maintenance costs": ("NetSuite Mgmt PL — 87310 (reconciliation)", ""),
     "VP%": ("IBM — planning_metrics_actuals", ""),
     "Weighted Availability": ("WM Venue Metrics Aggregated — WA (ISR)", _LOOKER_WA_AGGREGATED),
-    "KVI & Promo WA%": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
+    "KVI & Promo WA%": ("WM Venue Metrics Aggregated — KVI & Promo WA (ISR)", _LOOKER_KVI_AGGREGATED),
     "Sold from selection — sold_from_selection_perc": (
         "Purchases (exploration) — Sold from Selection %",
         _looker_sold_selection_url("sold_from_selection_perc"),
