@@ -111,7 +111,7 @@ STORAGE_ACTUALS = "okr2026_actuals_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
-TARGET_EDIT_PIN = "2026"  # 4-digit PIN to unlock Target tab editing
+TARGET_EDIT_PIN = "1618"  # 4-digit PIN to unlock Target tab editing
 TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
 
 # For review → Main KPIs insert order when user clicks "Use in dashboard".
