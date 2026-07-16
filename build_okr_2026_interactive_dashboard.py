@@ -111,6 +111,8 @@ STORAGE_ACTUALS = "okr2026_actuals_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
+TARGET_EDIT_PIN = "2026"  # 4-digit PIN to unlock Target tab editing
+TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
 
 # For review → Main KPIs insert order when user clicks "Use in dashboard".
 REVIEW_PROMOTION_MAIN: list[list[str]] = [
@@ -347,7 +349,9 @@ def _build_payload(
             "owners": STORAGE_OWNERS,
             "soldChoice": STORAGE_SOLD_CHOICE,
             "promotedReview": STORAGE_PROMOTED_REVIEW,
+            "targetUnlockSession": TARGET_UNLOCK_SESSION_KEY,
         },
+        "targetEditPin": TARGET_EDIT_PIN,
         "weeklyMetrics": list(WEEKLY_OKR_METRICS),
         "weeklyReviewMetrics": list(WEEKLY_REVIEW_METRICS),
         "weeklyLeaderMetrics": list(WEEKLY_LEADER_METRICS),
@@ -686,6 +690,47 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       color: var(--text); padding: 6px 8px; font-size: 12px;
     }
     .meta-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 3px rgba(0, 194, 232, 0.2); }
+    .target-lock-bar {
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+      font-size: 12px; color: var(--muted);
+    }
+    .target-lock-bar.locked { color: #92400e; }
+    .target-lock-bar.unlocked { color: #065f46; }
+    .btn-target-lock {
+      border: 1px solid var(--border); background: var(--surface);
+      color: var(--text); border-radius: 8px; padding: 6px 12px;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--font-ui);
+    }
+    .btn-target-lock:hover { border-color: var(--wolt-cyan); color: var(--wolt-cyan-deep); }
+    .btn-target-lock.primary {
+      background: var(--wolt-cyan-deep); border-color: var(--wolt-cyan-deep); color: #fff;
+    }
+    .btn-target-lock.primary:hover { background: #007a94; border-color: #007a94; color: #fff; }
+    #panelEdit.target-locked .target-input,
+    #panelEdit.target-locked .owner-input {
+      pointer-events: none; background: var(--surface2); color: var(--muted); cursor: not-allowed;
+    }
+    .target-pin-modal {
+      position: fixed; inset: 0; z-index: 2000;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px);
+    }
+    .target-pin-modal.hidden { display: none; }
+    .target-pin-dialog {
+      width: min(92vw, 320px); background: #fff; border-radius: 12px;
+      border: 1px solid var(--border); box-shadow: var(--shadow-md); padding: 18px 16px 14px;
+    }
+    .target-pin-dialog h3 { margin: 0 0 6px; font-size: 16px; color: var(--wolt-cyan-deep); }
+    .target-pin-dialog p { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+    .target-pin-input {
+      width: 100%; box-sizing: border-box; text-align: center; letter-spacing: 0.35em;
+      font-size: 22px; font-weight: 700; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--border); font-family: var(--font-ui);
+    }
+    .target-pin-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 3px rgba(0, 194, 232, 0.2); }
+    .target-pin-error { margin-top: 8px; font-size: 12px; color: #b91c1c; }
+    .target-pin-error.hidden { display: none; }
+    .target-pin-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
     .target-val { font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
     .edit-sub { font-size: 12px; color: var(--muted); font-weight: 600; display: block; margin-top: 4px; }
     .manual-row td { background: rgba(237, 233, 254, 0.35); }
@@ -908,7 +953,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       </div>
       <div class="panel-head">
         <h2>Target — goals only</h2>
-        <span style="font-size:12px;color:var(--muted);">Enter a target per month · auto-saved</span>
+        <div class="target-lock-bar locked" id="targetLockBar">
+          <span id="targetLockStatus">🔒 Locked — enter PIN to edit</span>
+          <button type="button" class="btn-target-lock primary" id="btnUnlockTargets">Enter PIN</button>
+          <button type="button" class="btn-target-lock hidden" id="btnLockTargets">Lock editing</button>
+        </div>
       </div>
       <div class="table-scroll">
         <table id="editTable">
@@ -954,6 +1003,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     </footer>
   </div>
 
+  <div class="target-pin-modal hidden" id="targetPinModal" aria-hidden="true">
+    <div class="target-pin-dialog" role="dialog" aria-labelledby="targetPinTitle">
+      <h3 id="targetPinTitle">Unlock Target editing</h3>
+      <p>Enter 4-digit PIN</p>
+      <input type="password" class="target-pin-input" id="targetPinInput" maxlength="4" inputmode="numeric" pattern="[0-9]*" autocomplete="off"/>
+      <p class="target-pin-error hidden" id="targetPinError">Wrong PIN — try again</p>
+      <div class="target-pin-actions">
+        <button type="button" class="btn-target-lock" id="targetPinCancel">Cancel</button>
+        <button type="button" class="btn-target-lock primary" id="targetPinSubmit">Unlock</button>
+      </div>
+    </div>
+  </div>
+
   <div class="save-toast" id="saveToast">Saved</div>
 
   <script>
@@ -969,7 +1031,90 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     let storageOk = true;
     let saveTimer = null;
     let activeTargetInput = null;
+    const targetUnlockKey = (CFG.storage && CFG.storage.targetUnlockSession) || "okr2026_target_unlocked_v1";
+    let targetEditUnlocked = sessionStorage.getItem(targetUnlockKey) === "1";
     const weeklyModeMetrics = new Set();
+
+    function isTargetEditUnlocked() { return targetEditUnlocked; }
+
+    function applyTargetEditLockState() {
+      const panel = document.getElementById("panelEdit");
+      const bar = document.getElementById("targetLockBar");
+      const status = document.getElementById("targetLockStatus");
+      const btnUnlock = document.getElementById("btnUnlockTargets");
+      const btnLock = document.getElementById("btnLockTargets");
+      const locked = !targetEditUnlocked;
+      if (panel) panel.classList.toggle("target-locked", locked);
+      if (bar) {
+        bar.classList.toggle("locked", locked);
+        bar.classList.toggle("unlocked", !locked);
+      }
+      if (status) {
+        status.textContent = locked
+          ? "🔒 Locked — enter PIN to edit"
+          : "🔓 Unlocked — targets auto-save";
+      }
+      if (btnUnlock) btnUnlock.classList.toggle("hidden", !locked);
+      if (btnLock) btnLock.classList.toggle("hidden", locked);
+    }
+
+    function openTargetPinModal() {
+      const modal = document.getElementById("targetPinModal");
+      const inp = document.getElementById("targetPinInput");
+      const err = document.getElementById("targetPinError");
+      if (!modal || !inp) return;
+      inp.value = "";
+      if (err) err.classList.add("hidden");
+      modal.classList.remove("hidden");
+      modal.setAttribute("aria-hidden", "false");
+      setTimeout(() => inp.focus(), 0);
+    }
+
+    function closeTargetPinModal() {
+      const modal = document.getElementById("targetPinModal");
+      if (!modal) return;
+      modal.classList.add("hidden");
+      modal.setAttribute("aria-hidden", "true");
+    }
+
+    function submitTargetPin() {
+      const inp = document.getElementById("targetPinInput");
+      const err = document.getElementById("targetPinError");
+      if (!inp) return;
+      const pin = String(inp.value || "").trim();
+      if (pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+        if (err) { err.textContent = "Enter exactly 4 digits"; err.classList.remove("hidden"); }
+        return;
+      }
+      if (pin !== String(CFG.targetEditPin || "")) {
+        if (err) { err.textContent = "Wrong PIN — try again"; err.classList.remove("hidden"); }
+        inp.select();
+        return;
+      }
+      targetEditUnlocked = true;
+      sessionStorage.setItem(targetUnlockKey, "1");
+      closeTargetPinModal();
+      applyTargetEditLockState();
+      renderEdit();
+      showSaveToast("Target editing unlocked");
+    }
+
+    function lockTargetEditing() {
+      targetEditUnlocked = false;
+      sessionStorage.removeItem(targetUnlockKey);
+      applyTargetEditLockState();
+      renderEdit();
+      showSaveToast("Target editing locked");
+    }
+
+    function showSaveToast(msg) {
+      const toast = document.getElementById("saveToast");
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.classList.add("show");
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => toast.classList.remove("show"), 2800);
+    }
 
     function hasWeeklyView(metric) {
       return (CFG.weeklyMetrics || []).includes(metric)
@@ -1465,6 +1610,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function setOwner(idx, field, value) {
+      if (!isTargetEditUnlocked()) return;
       const metric = metricByIdx(editMetricsList, idx);
       if (!owners[metric]) owners[metric] = {};
       owners[metric][field] = value;
@@ -1530,6 +1676,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function setTargetIdx(idx, monthKey, raw, finalize) {
+      if (!isTargetEditUnlocked()) return;
       const metric = metricByIdx(editMetricsList, idx);
       const k = cellKey(metric, monthKey);
       const trimmed = String(raw).trim();
@@ -1595,14 +1742,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function ownerCellHtml(idx, field) {
       const metric = metricByIdx(editMetricsList, idx);
       const val = escAttr(getOwner(metric)[field] || "");
-      return `<input type="text" class="meta-input owner-input" data-idx="${idx}" data-field="${field}" value="${val}" placeholder="—"/>`;
+      const ro = !isTargetEditUnlocked() ? ' readonly tabindex="-1"' : "";
+      return `<input type="text" class="meta-input owner-input" data-idx="${idx}" data-field="${field}" value="${val}" placeholder="—"${ro}/>`;
     }
 
     function valueInputHtml(idx, monthKey, kind, shown) {
       const metric = metricByIdx(editMetricsList, idx);
       const ph = targetPlaceholder(metric);
       const cls = kind === "actual" ? "actual-input" : "target-input";
-      const inp = `<input type="text" inputmode="decimal" class="${cls} value-input" data-kind="${kind}" data-idx="${idx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
+      const lockAttrs = (kind === "target" && !isTargetEditUnlocked()) ? ' readonly tabindex="-1"' : "";
+      const inp = `<input type="text" inputmode="decimal" class="${cls} value-input" data-kind="${kind}" data-idx="${idx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"${lockAttrs}/>`;
       if (isPercentMetric(metric)) {
         return `<span class="target-wrap percent">${inp}<span class="target-suffix">%</span></span>`;
       }
@@ -1986,7 +2135,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function bindValueInput(inp) {
       let debounce = null;
-      inp.addEventListener("focus", () => { activeTargetInput = inp; });
+      inp.addEventListener("focus", () => {
+        if (inp.dataset.kind === "target" && !isTargetEditUnlocked()) {
+          inp.blur();
+          openTargetPinModal();
+          return;
+        }
+        activeTargetInput = inp;
+      });
       inp.addEventListener("input", () => {
         clearTimeout(debounce);
         debounce = setTimeout(() => {
@@ -2043,7 +2199,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         }
       });
       tbody.querySelectorAll(".owner-input").forEach(inp => {
+        inp.addEventListener("focus", () => {
+          if (!isTargetEditUnlocked()) {
+            inp.blur();
+            openTargetPinModal();
+          }
+        });
         inp.addEventListener("input", () => {
+          if (!isTargetEditUnlocked()) return;
           const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
           if (!owners[metric]) owners[metric] = {};
           owners[metric][inp.dataset.field] = inp.value;
@@ -2080,6 +2243,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       selectedMonths = new Set([defaults[defaults.length - 1]]);
       renderPeriodChips(); renderMainLeaderChips(); renderPerformance(); renderLeader(); renderEditLeaderChips(); renderEdit(); renderReview(); renderToDelete();
     });
+
+    document.getElementById("btnUnlockTargets").addEventListener("click", openTargetPinModal);
+    document.getElementById("btnLockTargets").addEventListener("click", lockTargetEditing);
+    document.getElementById("targetPinCancel").addEventListener("click", closeTargetPinModal);
+    document.getElementById("targetPinSubmit").addEventListener("click", submitTargetPin);
+    document.getElementById("targetPinInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); submitTargetPin(); }
+      if (e.key === "Escape") { e.preventDefault(); closeTargetPinModal(); }
+    });
+    document.getElementById("targetPinModal").addEventListener("click", (e) => {
+      if (e.target.id === "targetPinModal") closeTargetPinModal();
+    });
+
+    applyTargetEditLockState();
 
     renderPeriodChips();
     renderMainLeaderChips();
