@@ -1,10 +1,9 @@
-# OKR 2026 V0 — ISR Wolt Market 1P
+# OKR 2026 — ISR Wolt Market 1P
 
 Dashboard and validation pipeline for OKR 2026 metrics (Jan–Dec 2026 targets, Jan–Jun 2026 Snowflake actuals).
 
-**Current version:** **V0** (tag `okr-2026-v0` · July 2026)
-
 ## Main deliverable
+
 **Live dashboard (share this link):**
 
 https://shirelzipori-droid.github.io/okr-2026/
@@ -53,9 +52,30 @@ Copy `snowflake_secrets.env` from Weekly Presentation (not committed) or use Okt
 | `okr_2026_default_targets.py` | Monthly targets Jan–Dec 2026 |
 | `okr_2026_metrics_registry.py` | Metric lists, owners, workflow |
 | `okr_2026_user_metrics.csv` | Optional manual metric overrides |
+| `okr_2026_versions.py` | Internal snapshot codes (V0, V1, …) — not shown in dashboard |
+| `restore_okr_version.py` | Restore a snapshot by code |
 
-## Versions
+## Internal snapshots (not shown in dashboard)
 
-| Version | Tag | Notes |
-|---------|-----|-------|
-| **V0** | `okr-2026-v0` | First stable checkpoint: interactive dashboard, weekly drill-down, PIN-protected Target editing, Jan–Jun 2026 actuals |
+Use short codes to save or restore a known state. The live dashboard always shows **OKR 2026** only.
+
+| Code | Git tag | Saved |
+|------|---------|-------|
+| **V0** | `okr-2026-v0` | 2026-07-16 — first stable checkpoint |
+
+**List snapshots:**
+
+```powershell
+python restore_okr_version.py --list
+```
+
+**Restore V0:**
+
+```powershell
+python restore_okr_version.py V0
+git checkout main   # back to latest when done
+```
+
+Or tell Cursor: *"חזור ל-V0"* — it will use tag `okr-2026-v0`.
+
+When saving a new checkpoint, add an entry to `okr_2026_versions.py` and create a git tag (e.g. `okr-2026-v1`).
