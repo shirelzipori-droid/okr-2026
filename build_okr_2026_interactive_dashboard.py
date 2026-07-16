@@ -113,6 +113,7 @@ STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
 TARGET_EDIT_PIN = "1618"  # 4-digit PIN to unlock Target tab editing
 TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
+DASHBOARD_VERSION = "V0"
 
 # For review → Main KPIs insert order when user clicks "Use in dashboard".
 REVIEW_PROMOTION_MAIN: list[list[str]] = [
@@ -334,6 +335,7 @@ def _build_payload(
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
         "defaultTargetsNote": "OKR 2026 target spreadsheet · Jan–Dec 2026",
+        "dashboardVersion": DASHBOARD_VERSION,
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
@@ -369,7 +371,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>OKR 2026 — Wolt Market ISR</title>
+  <title>OKR 2026 V0 — Wolt Market ISR</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
@@ -495,6 +497,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       letter-spacing: -0.04em;
       color: #fff;
       line-height: 1.1;
+    }
+    .brand-text .version-badge {
+      display: inline-block; margin-left: 8px; vertical-align: middle;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.06em;
+      padding: 2px 8px; border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.35);
+      color: #fff;
     }
     .brand-text .subtitle {
       color: rgba(255, 255, 255, 0.9);
@@ -868,7 +877,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <img class="wm-logo-img" src="__LOGO_DATA_URI__" alt="Wolt Market"/>
         </div>
         <div class="brand-text">
-          <h1>OKR 2026</h1>
+          <h1>OKR 2026 <span class="version-badge">V0</span></h1>
           <p class="subtitle">ISR · 1P Local · Main KPIs · Jan–Dec 2026</p>
         </div>
       </div>

@@ -1,9 +1,10 @@
-# OKR 2026 — ISR Wolt Market 1P
+# OKR 2026 V0 — ISR Wolt Market 1P
 
 Dashboard and validation pipeline for OKR 2026 metrics (Jan–Dec 2026 targets, Jan–Jun 2026 Snowflake actuals).
 
-## Main deliverable
+**Current version:** **V0** (tag `okr-2026-v0` · July 2026)
 
+## Main deliverable
 **Live dashboard (share this link):**
 
 https://shirelzipori-droid.github.io/okr-2026/
@@ -53,4 +54,8 @@ Copy `snowflake_secrets.env` from Weekly Presentation (not committed) or use Okt
 | `okr_2026_metrics_registry.py` | Metric lists, owners, workflow |
 | `okr_2026_user_metrics.csv` | Optional manual metric overrides |
 
-Saved checkpoint: July 2026.
+## Versions
+
+| Version | Tag | Notes |
+|---------|-----|-------|
+| **V0** | `okr-2026-v0` | First stable checkpoint: interactive dashboard, weekly drill-down, PIN-protected Target editing, Jan–Jun 2026 actuals |
