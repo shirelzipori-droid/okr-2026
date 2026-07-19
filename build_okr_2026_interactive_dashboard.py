@@ -278,7 +278,6 @@ METRIC_FORMAT: dict[str, str] = {
     "Utilities costs reduce": "percent:1",
     "Fulfillment & Drive partner": "decimal:1",
     "3PFL GOV (yearly)": "integer",
-    "Robotic store": "integer",
     "Turning B stores to A": "integer",
     "Awareness": "percent:1",
     "New special vendors or categories": "integer",
@@ -340,7 +339,7 @@ def _default_format(name: str) -> str:
         return METRIC_FORMAT[name]
     if "%" in name or name.endswith(">") or name.endswith("<"):
         return "percent:1"
-    if any(x in name for x in ("Stores", "GOV", "Robotic", "vendors")):
+    if any(x in name for x in ("Stores", "GOV", "vendors")):
         return "integer"
     return "decimal:1"
 
