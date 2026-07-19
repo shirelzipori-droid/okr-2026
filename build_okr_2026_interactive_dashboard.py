@@ -141,14 +141,21 @@ METRIC_DIRECTION: dict[str, str] = {
 
 # Gap vs target: one column for the selected period filter (month chips).
 # "cumulative_absolute" = sum(actual) − sum(target) across selected months (Orders)
-# "average_vs_average" = avg(actual) − avg(target); show abs + % change (DDE FEE/order)
+# "average_vs_average" = simple avg(actual) − avg(target); abs + % (PPM%)
+# "weighted_average" = Orders-weighted avg(actual) − weighted avg(target); abs + %
 # "absolute" = sum(actual − target) for selected period (default until configured)
 GAP_MODE_DEFAULT = "absolute"
 GAP_MODES: dict[str, str] = {
     "Orders": "cumulative_absolute",
-    "DDE FEE/order": "average_vs_average",
+    "DDE FEE/order": "weighted_average",
     "PPM%": "average_vs_average",
-    "Shrink/DDE FEE": "average_vs_average",
+    "Shrink/DDE FEE": "weighted_average",
+    "OFL / order (ILS)": "weighted_average",
+}
+GAP_WEIGHT_METRICS: dict[str, str] = {
+    "DDE FEE/order": "Orders",
+    "Shrink/DDE FEE": "Orders",
+    "OFL / order (ILS)": "Orders",
 }
 
 METRIC_HINTS: dict[str, str] = {
@@ -356,6 +363,7 @@ def _build_payload(
         "direction": {m: METRIC_DIRECTION.get(m, "higher") for m in ALL_METRIC_NAMES},
         "gapModeDefault": GAP_MODE_DEFAULT,
         "gapModes": GAP_MODES,
+        "gapWeightMetrics": GAP_WEIGHT_METRICS,
         "format": format_map,
         "storage": {
             "targets": STORAGE_TARGETS,
@@ -1765,12 +1773,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return (CFG.gapModes && CFG.gapModes[metric]) || CFG.gapModeDefault || "absolute";
     }
 
-    function averageTargetForMetric(metric, monthKeys) {
-      const vals = monthKeys
-        .map(k => getTarget(metric, k))
-        .filter(v => v !== null && v !== undefined);
-      if (!vals.length) return null;
-      return vals.reduce((a, b) => a + b, 0) / vals.length;
+    function gapWeightMetric(metric) {
+      return (CFG.gapWeightMetrics && CFG.gapWeightMetrics[metric]) || "Orders";
     }
 
     function averageCompareTotals(metric, monthKeys) {
@@ -1795,6 +1799,45 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return { actual: avgActual, target: avgTarget, gap, pctGap, months: used };
     }
 
+    function weightedCompareTotals(metric, monthKeys) {
+      const weightMetric = gapWeightMetric(metric);
+      const ordered = monthKeys.slice().sort();
+      let actualWeightedSum = 0;
+      let actualWeightSum = 0;
+      let targetWeightedSum = 0;
+      let targetWeightSum = 0;
+      let used = 0;
+      for (const mk of ordered) {
+        const idx = monthIndex(mk);
+        const actual = getActual(metric, idx);
+        const target = getTarget(metric, mk);
+        const wActual = getActual(weightMetric, idx);
+        const wTarget = getTarget(weightMetric, mk);
+        if (actual !== null && wActual !== null && wActual > 0) {
+          actualWeightedSum += actual * wActual;
+          actualWeightSum += wActual;
+        }
+        if (target !== null && wTarget !== null && wTarget > 0) {
+          targetWeightedSum += target * wTarget;
+          targetWeightSum += wTarget;
+        }
+        if (actual !== null && target !== null) used += 1;
+      }
+      if (!actualWeightSum || !targetWeightSum || !used) return null;
+      const avgActual = actualWeightedSum / actualWeightSum;
+      const avgTarget = targetWeightedSum / targetWeightSum;
+      const gap = avgActual - avgTarget;
+      const pctGap = avgTarget !== 0 ? (gap / avgTarget) * 100 : null;
+      return {
+        actual: avgActual,
+        target: avgTarget,
+        gap,
+        pctGap,
+        months: used,
+        weightMetric,
+      };
+    }
+
     function selectionTotals(metric, monthKeys) {
       const ordered = monthKeys.slice().sort();
       let actualSum = 0;
@@ -1815,6 +1858,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function computeSelectionGap(metric, monthKeys) {
       const mode = gapMode(metric);
+      if (mode === "weighted_average") return weightedCompareTotals(metric, monthKeys);
       if (mode === "average_vs_average") return averageCompareTotals(metric, monthKeys);
       return selectionTotals(metric, monthKeys);
     }
@@ -1843,6 +1887,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function gapReferenceLabel(metric, monthKeys, totals) {
       const mode = gapMode(metric);
       if (!totals) return "";
+      if (mode === "weighted_average") {
+        const w = totals.weightMetric || gapWeightMetric(metric);
+        return `Wavg ${formatTargetValue(metric, totals.actual)} vs ${formatTargetValue(metric, totals.target)} · ${w}`;
+      }
       if (mode === "average_vs_average") {
         return `Avg ${formatTargetValue(metric, totals.actual)} vs ${formatTargetValue(metric, totals.target)}`;
       }
@@ -1852,9 +1900,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return `ΣT ${formatTargetValue(metric, totals.target)}`;
     }
 
+    function gapShowsPct(mode) {
+      return mode === "average_vs_average" || mode === "weighted_average";
+    }
+
     function gapValueHtml(metric, totals) {
       const mode = gapMode(metric);
-      if (mode === "average_vs_average") {
+      if (gapShowsPct(mode)) {
         const pctTxt = formatGapPct(totals.pctGap);
         return `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`
           + (pctTxt ? `<div class="gap-val gap-pct">${escHtml(pctTxt)}</div>` : "");
@@ -2197,12 +2249,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function gapHeaderSubLabel(metrics, monthKeys) {
       const periodLbl = selectedPeriodLabel(monthKeys);
       const modes = new Set((metrics || []).map(m => gapMode(m)));
-      if (modes.has("average_vs_average") && modes.has("cumulative_absolute")) {
-        return `${periodLbl} · avg / cumulative`;
-      }
-      if (modes.has("average_vs_average")) return `${periodLbl} · avg`;
-      if (modes.has("cumulative_absolute")) return `${periodLbl} · cumulative`;
-      return `${periodLbl} · cumulative`;
+      const parts = [];
+      if (modes.has("weighted_average")) parts.push("wavg");
+      if (modes.has("average_vs_average")) parts.push("avg");
+      if (modes.has("cumulative_absolute")) parts.push("cumulative");
+      if (!parts.length) parts.push("cumulative");
+      return `${periodLbl} · ${parts.join(" / ")}`;
     }
 
     function renderPerformanceTableHead(tableId, metrics) {
