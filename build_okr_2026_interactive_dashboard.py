@@ -207,6 +207,11 @@ RATIO_AUTO_ACTUAL_COMPONENTS: list[str] = [DC_DENOMINATOR]
 YEARLY_TARGET_KEY = "yearly"
 YEARLY_TARGET_METRICS: list[str] = [
     "New special vendors or categories",
+    "Utilities costs reduce",
+    "Awareness",
+    "IDP & HQ training",
+    "Internal Mobility",
+    "OPS Training",
     "DC",
 ]
 GAP_WEIGHT_METRICS: dict[str, str] = {
@@ -2326,9 +2331,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return Number(row[idx]);
     }
 
+    function getYearlyActual(metric) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const k = cellKey(metric, yKey);
+      if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "")
+        return Number(actualOverrides[k]);
+      return null;
+    }
+
     function getActual(metric, idx) {
       const monthKey = CFG.monthKeys[idx];
       if (isRatioMetric(metric)) return getRatioActual(metric, monthKey);
+      if (isYearlyTargetMetric(metric)) return getYearlyActual(metric);
       const k = cellKey(metric, monthKey);
       if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "")
         return Number(actualOverrides[k]);
@@ -2588,19 +2602,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function yearlyTargetGapTotals(metric, monthKeys) {
       const yt = getYearlyTarget(metric);
       if (yt === null) return null;
-      const ordered = monthKeys.slice().sort();
-      let actualSum = 0;
-      let used = 0;
-      for (const mk of ordered) {
-        const actual = getActual(metric, monthIndex(mk));
-        if (actual === null) continue;
-        actualSum += actual;
-        used += 1;
-      }
-      if (!used) return null;
-      const gap = actualSum - yt;
+      const actual = getYearlyActual(metric);
+      if (actual === null) return null;
+      const gap = actual - yt;
       const pctGap = yt !== 0 ? (gap / yt) * 100 : null;
-      return { actual: actualSum, target: yt, gap, pctGap, months: used, yearly: true };
+      return { actual, target: yt, gap, pctGap, months: 1, yearly: true };
     }
 
     function computeSelectionGap(metric, monthKeys) {
@@ -2668,7 +2674,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return `Σ ${formatInteger(totals.numSum)} / ${formatInteger(totals.denSum)} = ${formatValue(metric, totals.actual)} vs YT ${formatValue(metric, totals.target)}`;
       }
       if (isYearlyTargetMetric(metric)) {
-        return `Σ ${formatTargetValue(metric, totals.actual)} vs YT ${formatTargetValue(metric, totals.target)}`;
+        return `Actual ${formatTargetValue(metric, totals.actual)} vs YT ${formatTargetValue(metric, totals.target)}`;
       }
       const mode = gapMode(metric);
       if (!totals) return "";
@@ -2712,6 +2718,33 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           + (pctTxt ? `<div class="gap-val gap-pct">${escHtml(pctTxt)}</div>` : "");
       }
       return `<div class="gap-val">${formatGapValue(metric, totals.gap, mode)}</div>`;
+    }
+
+    function yearlyActualCellHtml(metric, monthCount, manual, mIdx) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const actual = getYearlyActual(metric);
+      const override = getActualOverride(metric, yKey);
+      const actualShown = override !== undefined && override !== null && override !== ""
+        ? formatTargetDisplay(metric, override)
+        : "";
+      const yt = getYearlyTarget(metric);
+      let cls = "cell-actual yearly-month";
+      if (actual === null && !manual) {
+        return `<td colspan="${monthCount}" class="yearly-target-col"><div class="cell-actual no-actual yearly-month">—</div></td>`;
+      }
+      if (yt !== null && actual !== null) {
+        cls += meetsTarget(actual, yt, metric) ? " hit" : " miss";
+        cls += " has-target";
+      } else {
+        cls += " no-target";
+      }
+      const actualHtml = (manual && mIdx !== undefined)
+        ? actualInlineInputHtml(metric, mIdx, yKey, actualShown)
+        : `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
+      const targetHtml = yt !== null
+        ? `<div class="cell-target-mini"><span class="lbl">YT</span>${formatTargetValue(metric, yt)}</div>`
+        : "";
+      return `<td colspan="${monthCount}" class="yearly-target-col"><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}${targetHtml}</div></div></td>`;
     }
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
@@ -3072,16 +3105,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               }
               const monthKey = weekKey.slice(0, 7);
               if (isRatioMetric(metric)) return ratioPerformanceCellHtml(metric, monthKey);
+              if (isYearlyTargetMetric(metric)) {
+                return `<td><div class="cell-actual no-actual yearly-month">—</div></td>`;
+              }
               const idx = monthIndex(monthKey);
               const actual = getActual(metric, idx);
-              if (isYearlyTargetMetric(metric)) {
-                if (actual === null && !manual) {
-                  return `<td><div class="cell-actual no-actual yearly-month">—</div></td>`;
-                }
-                return `<td><div class="perf-cell-wrap"><div class="cell-actual yearly-month no-target">`
-                  + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
-                  + `</div></div></td>`;
-              }
               const target = getTarget(metric, monthKey);
               if (actual === null && !manual && target === null) {
                 return `<td><div class="cell-actual no-actual">—</div></td>`;
@@ -3099,6 +3127,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
                 + `</div>${targetHtml}</div></td>`;
             }).join("")
+          : isYearlyTargetMetric(metric)
+          ? yearlyActualCellHtml(metric, months.length, manual, mIdx)
+            + (showGap
+              ? `<td class="gap-divider" aria-hidden="true"></td>`
+                + gapPerformanceCellHtml(metric, months)
+              : "")
           : months.map(monthKey => {
           const idx = monthIndex(monthKey);
           const actual = getActual(metric, idx);
