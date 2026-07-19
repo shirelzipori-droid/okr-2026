@@ -10,7 +10,9 @@ SOLD_FROM_SELECTION_TARGET_NAME = "Sold from selection (store level)"
 YEARLY_TARGET_KEY = "yearly"
 
 # Single annual target per metric — key in flat map: f"{metric}|yearly"
-OKR_2026_YEARLY_TARGETS: dict[str, float] = {}
+OKR_2026_YEARLY_TARGETS: dict[str, float] = {
+    "DC": 36.0,
+}
 
 # 12 months: Jan–Dec 2026. Synced with dashboard Target tab (Jan–Jun 2026).
 OKR_2026_TARGET_BY_METRIC: dict[str, list[float | None]] = {

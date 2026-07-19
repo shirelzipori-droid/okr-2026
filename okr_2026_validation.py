@@ -47,7 +47,7 @@ LOOKER: dict[str, list[float | None]] = {
     "Order Frequency": [2.98, 2.85, 3.32, None, None, None],
     "Penetration Rate": [14.5, 14.3, 12.8, 15.1, 15.6, 14.8],
     "Area Product Selection": [4466, 4535, 4292, 3743, 4316, 4591],
-    "SOLD UNITS": [None, None, None, None, None, None],
+    "SOLD UNITS": [4097668, 3727947, 3988782, 3847804, 4307323, 4237300],
     "%Fresh Food / DDE": [38.98, 38.47, 40.00, None, None, None],
     "IDQ": [97.6, 97.7, 97.70, None, None, None],
     "VSL": [74.6, 67.3, 61.0, None, None, None],
@@ -660,7 +660,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
     "Order Frequency": "Order Frequency",
     "Penetration Rate": "Active Users % of Country MAU",
     "Area Product Selection": "Available Selection (Golden Selection 106615)",
-    "SOLD UNITS": "TOTAL_UNITS (Golden Growth 106613 · ISR country)",
+    "SOLD UNITS": "SOLD_UNITS (Golden Growth 106613 · MART WM ISR)",
     "VSL": "Vendor Service Level % (Golden SCM 106617 · ISR incl. DC)",
     "UP-TIME >": "Weighted Uptime %",
     "% Bad Goods Rating": "Bad Goods Rating % — Golden Store Ops 106616",
@@ -697,7 +697,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Order Frequency": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Penetration Rate": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Area Product Selection": ("Golden Selection — ISR (106615)", _LOOKER_GOLDEN_SELECTION),
-    "SOLD UNITS": ("Golden Growth — TOTAL_UNITS (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "SOLD UNITS": ("Golden Growth — Sold Units (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "%Fresh Food / DDE": ("—", ""),
     "VSL": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
     "UP-TIME >": ("Golden Store Ops — ISR (106616)", _LOOKER_GOLDEN_STORE_OPS),
@@ -1028,18 +1028,20 @@ GROUP BY 1
 ORDER BY m
 """
 
-# Avg Units from presentation country row (Golden Growth 106613).
-SQL_GOLDEN_GROWTH_PRESENTATION = """
-SELECT DATE_TRUNC('month', DATE)::DATE AS m,
-  TOTAL_ORDERS,
-  TOTAL_UNITS
-FROM PRODUCTION.PRESENTATION.WOLT_MARKET_METRICS
-WHERE PERIOD = 'month'
-  AND COUNTRY = 'ISR'
-  AND AREA = 'country'
-  AND VENUE_NAME IS NULL
-  AND DATE >= '2026-01-01'
-  AND DATE < '2026-07-01'
+# Sold Units + Avg Units denominator (Golden Growth 106613 — MART SOLD_UNITS, not presentation TOTAL_UNITS).
+SQL_GOLDEN_GROWTH_SOLD_UNITS = """
+SELECT DATE_TRUNC('month', METRIC_DATE)::DATE AS m,
+  SUM(SOLD_UNITS) AS sold_units,
+  SUM(TOTAL_ORDERS_COUNT) AS total_orders
+FROM PRODUCTION.MART.WOLT_MARKET_VENUE_METRICS_MONTHLY
+WHERE VENUE_COUNTRY = 'ISR'
+  AND RETAIL_PLATFORM_FRANCHISE_NAME = 'woltmarket'
+  AND WOLT_PRODUCT_LINE_HIERARCHY_3 = 'supermarket'
+  AND RETAIL_PLATFORM_VENUE_NAME LIKE 'Wolt Market |%'
+  AND RETAIL_PLATFORM_VENUE_STATUS = 'ACTIVE'
+  AND METRIC_DATE >= '2026-01-01'
+  AND METRIC_DATE < '2026-07-01'
+GROUP BY 1
 ORDER BY m
 """
 
@@ -1798,15 +1800,15 @@ def fetch_metrics() -> tuple[
                 i = _month_index(m)
                 data["Order Frequency"][i] = _round_val("Order Frequency", float(order_freq) if order_freq is not None else None)
 
-            cur.execute(SQL_GOLDEN_GROWTH_PRESENTATION)
+            cur.execute(SQL_GOLDEN_GROWTH_SOLD_UNITS)
             for row in cur.fetchall():
-                m, orders, units = row
+                m, sold_units, orders = row
                 i = _month_index(m)
                 data["Avg Units per Order"][i] = _round_val(
-                    "Avg Units per Order", _safe_div(units, orders)
+                    "Avg Units per Order", _safe_div(sold_units, orders)
                 )
                 data["SOLD UNITS"][i] = _round_val(
-                    "SOLD UNITS", float(units) if units is not None else None
+                    "SOLD UNITS", float(sold_units) if sold_units is not None else None
                 )
 
             cur.execute(SQL_GOLDEN_GROWTH_ACTIVE_USERS_MAU)
