@@ -157,6 +157,7 @@ GAP_MODES: dict[str, str] = {
     "KVI & Promo WA%": "average_vs_average",
     "POFR%": "average_vs_average",
     "Under 45min >": "average_vs_average",
+    "UP-TIME >": "average_vs_average",
 }
 GAP_WEIGHT_METRICS: dict[str, str] = {
     "DDE FEE/order": "Orders",
