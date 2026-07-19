@@ -3214,7 +3214,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function gapHeaderPeriodLabel(monthKeys) {
       if (!monthKeys.length) return "";
       const ordered = monthKeys.slice().sort();
-      return ordered.map(k => CFG.monthLabels[monthIndex(k)]).join("  ");
+      const first = CFG.monthLabels[monthIndex(ordered[0])];
+      const last = CFG.monthLabels[monthIndex(ordered[ordered.length - 1])];
+      return first === last ? first : `${first}-${last}`;
     }
 
     function renderPerformanceTableHead(tableId, metrics) {

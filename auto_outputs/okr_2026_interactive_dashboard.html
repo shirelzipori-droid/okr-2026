@@ -2689,7 +2689,9 @@
     function gapHeaderPeriodLabel(monthKeys) {
       if (!monthKeys.length) return "";
       const ordered = monthKeys.slice().sort();
-      return ordered.map(k => CFG.monthLabels[monthIndex(k)]).join("  ");
+      const first = CFG.monthLabels[monthIndex(ordered[0])];
+      const last = CFG.monthLabels[monthIndex(ordered[ordered.length - 1])];
+      return first === last ? first : `${first}-${last}`;
     }
 
     function renderPerformanceTableHead(tableId, metrics) {
@@ -2708,7 +2710,8 @@
           }).join("");
       const gapHeaders = showGap
         ? `<th class="gap-divider" aria-hidden="true"></th>`
-          + `<th class="gap-col">Cumulative Gap<span class="th-sub">${escHtml(gapPeriod)}</span></th>`
+          + `<th class="gap-col"><span class="gap-col-title">Cumulative Gap</span>`
+          + `<span class="gap-col-period">${escHtml(gapPeriod)}</span></th>`
         : "";
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + actualHeaders + gapHeaders + "</tr>";
