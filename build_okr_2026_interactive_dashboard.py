@@ -139,11 +139,14 @@ METRIC_DIRECTION: dict[str, str] = {
     "Early Attrition (0-3) <": "lower",
 }
 
-# Gap vs target display mode per metric (internal registry — configure metric-by-metric).
+# Gap vs target display mode per metric (configure metric-by-metric).
 # "absolute" = actual − target for the month
+# "cumulative_absolute" = sum(actual − target) from first selected month through this month
 # "vs_average" = actual − average target across selected months
 GAP_MODE_DEFAULT = "absolute"
-GAP_MODES: dict[str, str] = {}
+GAP_MODES: dict[str, str] = {
+    "Orders": "cumulative_absolute",
+}
 
 METRIC_HINTS: dict[str, str] = {
     "Orders": "Thousands (K)",
@@ -1768,9 +1771,37 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
-    function computeGap(metric, actual, target, monthKeys) {
-      if (actual === null) return null;
+    function cumulativeTotalsThrough(metric, monthKey, monthKeys) {
+      const ordered = monthKeys.slice().sort();
+      const endIdx = ordered.indexOf(monthKey);
+      if (endIdx < 0) return null;
+      let actualSum = 0;
+      let targetSum = 0;
+      for (let i = 0; i <= endIdx; i++) {
+        const mk = ordered[i];
+        const idx = monthIndex(mk);
+        const actual = getActual(metric, idx);
+        const target = getTarget(metric, mk);
+        if (actual !== null) actualSum += actual;
+        if (target !== null) targetSum += target;
+      }
+      const monthIdx = monthIndex(monthKey);
+      const monthActual = getActual(metric, monthIdx);
+      const monthTarget = getTarget(metric, monthKey);
+      if (monthActual === null || monthTarget === null) return null;
+      return { actual: actualSum, target: targetSum, gap: actualSum - targetSum };
+    }
+
+    function computeGap(metric, monthKey, monthKeys) {
       const mode = gapMode(metric);
+      if (mode === "cumulative_absolute") {
+        const cum = cumulativeTotalsThrough(metric, monthKey, monthKeys);
+        return cum ? cum.gap : null;
+      }
+      const idx = monthIndex(monthKey);
+      const actual = getActual(metric, idx);
+      const target = getTarget(metric, monthKey);
+      if (actual === null) return null;
       if (mode === "vs_average") {
         const avg = averageTargetForMetric(metric, monthKeys);
         if (avg === null) return null;
@@ -1780,6 +1811,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return actual - target;
     }
 
+    function gapComparisonTotals(metric, monthKey, monthKeys) {
+      const mode = gapMode(metric);
+      const idx = monthIndex(monthKey);
+      const actual = getActual(metric, idx);
+      const target = getTarget(metric, monthKey);
+      if (mode === "cumulative_absolute") return cumulativeTotalsThrough(metric, monthKey, monthKeys);
+      if (mode === "vs_average") {
+        const avg = averageTargetForMetric(metric, monthKeys);
+        if (actual === null || avg === null) return null;
+        return { actual, target: avg, gap: actual - avg };
+      }
+      if (actual === null || target === null) return null;
+      return { actual, target, gap: actual - target };
+    }
+
     function formatGapValue(metric, gap) {
       if (gap === null) return "—";
       let txt = formatDisplay(metric, gap, false);
@@ -1787,12 +1833,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return txt;
     }
 
-    function gapReferenceLabel(metric, target, monthKeys) {
-      if (gapMode(metric) === "vs_average") {
+    function gapReferenceLabel(metric, monthKey, monthKeys) {
+      const mode = gapMode(metric);
+      if (mode === "vs_average") {
         const avg = averageTargetForMetric(metric, monthKeys);
         if (avg === null) return "";
         return `Avg ${formatTargetValue(metric, avg)}`;
       }
+      if (mode === "cumulative_absolute") {
+        const cum = cumulativeTotalsThrough(metric, monthKey, monthKeys);
+        if (!cum) return "";
+        return `ΣT ${formatTargetValue(metric, cum.target)}`;
+      }
+      const target = getTarget(metric, monthKey);
       if (target === null) return "";
       return `T ${formatTargetValue(metric, target)}`;
     }
@@ -1810,21 +1863,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">${actualHtml}</div></div></td>`;
     }
 
-    function gapPerformanceCellHtml(metric, actual, target, monthKeys) {
-      const gap = computeGap(metric, actual, target, monthKeys);
+    function gapPerformanceCellHtml(metric, monthKey, monthKeys) {
+      const gap = computeGap(metric, monthKey, monthKeys);
       if (gap === null) {
         return `<td class="gap-col"><div class="cell-gap empty">—</div></td>`;
       }
-      const refTarget = gapMode(metric) === "vs_average"
-        ? averageTargetForMetric(metric, monthKeys)
-        : target;
-      const met = refTarget !== null && actual !== null
-        ? meetsTarget(actual, refTarget, metric)
-        : null;
+      const totals = gapComparisonTotals(metric, monthKey, monthKeys);
+      const met = totals ? meetsTarget(totals.actual, totals.target, metric) : null;
       const cls = met ? "hit" : "miss";
-      const ref = gapReferenceLabel(metric, target, monthKeys);
+      const ref = gapReferenceLabel(metric, monthKey, monthKeys);
+      const cumHint = gapMode(metric) === "cumulative_absolute"
+        ? `<div class="gap-target-ref">YTD</div>`
+        : "";
       return `<td class="gap-col"><div class="cell-gap ${cls}">`
         + `<div class="gap-val">${formatGapValue(metric, gap)}</div>`
+        + cumHint
         + (ref ? `<div class="gap-target-ref">${escHtml(ref)}</div>` : "")
         + `</div></td>`;
     }
@@ -2100,12 +2153,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         }).join("")
           + (showGap
             ? `<td class="gap-divider" aria-hidden="true"></td>`
-              + months.map(monthKey => {
-                const idx = monthIndex(monthKey);
-                const actual = getActual(metric, idx);
-                const target = getTarget(metric, monthKey);
-                return gapPerformanceCellHtml(metric, actual, target, months);
-              }).join("")
+              + months.map(monthKey => gapPerformanceCellHtml(metric, monthKey, months)).join("")
             : "");
         let rowCls = manual ? "manual-row" : "";
         if (wf === "cancelled") rowCls = (rowCls ? rowCls + " " : "") + "row-cancelled";
