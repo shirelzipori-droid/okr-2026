@@ -9,7 +9,7 @@ SOLD_FROM_SELECTION_TARGET_NAME = "Sold from selection (store level)"
 
 # 12 months: Jan–Dec 2026. None = no monthly target in spreadsheet.
 OKR_2026_TARGET_BY_METRIC: dict[str, list[float | None]] = {
-    "Orders": [386, 329, 357, 381, 410, 428, 447, 458, 460, 498, 481, 503],
+    "Orders": [386, 329, 357, 381, 410, 408, 447, 458, 460, 498, 481, 503],
     "DDE FEE/order": [154.8, 152.8, 154.1, 158.2, 157.2, 157.8, 160.1, 162, 164, 164.9, 165.9, 167],
     "FTU": [126, 126, 118, 118, 143, 143, 151, 151, 160, 168, 168, 177],
     "FTU Conversion": [26, 26, 25, 24, 23, 26, 25, 25, 24, 25, 25, 26],
