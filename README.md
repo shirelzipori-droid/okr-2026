@@ -63,6 +63,7 @@ Use short codes to save or restore a known state. The live dashboard always show
 |------|---------|-------|
 | **V0** | `okr-2026-v0` | 2026-07-16 — first stable checkpoint |
 | **V1** | `okr-2026-v1` | 2026-07-19 — yearly single-cell metrics + DC; before Yearly Target UI labels |
+| **V2** | `okr-2026-v2` | 2026-07-19 — **latest** — Yearly Target for all KPIs, Cumulative Gap header |
 
 **List snapshots:**
 
@@ -70,13 +71,13 @@ Use short codes to save or restore a known state. The live dashboard always show
 python restore_okr_version.py --list
 ```
 
-**Restore V0 or V1:**
+**Restore a snapshot (latest = V2):**
 
 ```powershell
-python restore_okr_version.py V1
+python restore_okr_version.py V2
 git checkout main   # back to latest when done
 ```
 
-Or tell Cursor: *"חזור ל-V1"* — it will use tag `okr-2026-v1`.
+Or tell Cursor: *"חזור ל-V2"* — it will use tag `okr-2026-v2`.
 
 When saving a new checkpoint, add an entry to `okr_2026_versions.py` and create a git tag (e.g. `okr-2026-v1`).

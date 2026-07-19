@@ -38,9 +38,19 @@ SNAPSHOTS: dict[str, OkrSnapshot] = {
             "Robotic store removed"
         ),
     ),
+    "V2": OkrSnapshot(
+        code="V2",
+        tag="okr-2026-v2",
+        date="2026-07-19",
+        notes=(
+            "Latest: Yearly Target column for all KPIs (Target + Gap cards), yearly "
+            "single-cell Actual metrics, DC manual UNITS + editable yearly %, Cumulative "
+            "Gap header (2 lines, Jan 26-Jul 26 range), Robotic store removed"
+        ),
+    ),
 }
 
-CURRENT_SNAPSHOT = "V1"
+CURRENT_SNAPSHOT = "V2"
 
 
 def get_snapshot(code: str) -> OkrSnapshot:
