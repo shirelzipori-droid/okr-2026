@@ -192,13 +192,14 @@ GAP_MODES: dict[str, str] = {
 }
 GAP_PCT_ONLY_METRICS: list[str] = list(AVERAGE_PCT_GAP_METRICS)
 
-# DC = DC UNITS ÷ Total Units (manual ratio · yearly target).
+# DC = DC UNITS ÷ SOLD UNITS (manual ratio · yearly target).
 DC_NUMERATOR = "DC UNITS"
-DC_DENOMINATOR = "Total Units"
+DC_DENOMINATOR = "SOLD UNITS"
 RATIO_METRICS: dict[str, dict[str, str]] = {
     "DC": {"numerator": DC_NUMERATOR, "denominator": DC_DENOMINATOR},
 }
 RATIO_COMPONENT_METRICS: list[str] = [DC_NUMERATOR, DC_DENOMINATOR]
+RATIO_AUTO_ACTUAL_COMPONENTS: list[str] = [DC_DENOMINATOR]
 
 # Metrics whose Target tab accepts only a single annual target (not monthly).
 YEARLY_TARGET_KEY = "yearly"
@@ -223,8 +224,8 @@ METRIC_HINTS: dict[str, str] = {
     "VSL": "ISR country incl. DC",
     "VP (K ILS)": "Variable Profit · K ILS (Monthly Plan)",
     "DC UNITS": "Units through DC (manual)",
-    "Total Units": "Total units (manual)",
-    "DC": "DC UNITS ÷ Total Units",
+    "SOLD UNITS": "Total sold units (Golden Growth 106613)",
+    "DC": "DC UNITS ÷ SOLD UNITS",
 }
 
 # Display format: percent | integer | decimal:N (N = decimal places for actuals)
@@ -269,7 +270,7 @@ METRIC_FORMAT: dict[str, str] = {
     "Awareness": "percent:1",
     "New special vendors or categories": "integer",
     "DC UNITS": "integer",
-    "Total Units": "integer",
+    "SOLD UNITS": "integer",
     "DC": "percent:1",
     "Forecast accuracy +/-": "percent:1",
     "UPH >": "decimal:1",
@@ -362,6 +363,11 @@ def _build_payload(
             actuals[name] = _pad_series(actuals_snow[name])
         else:
             actuals[name] = [None] * DASHBOARD_MONTH_COUNT
+    for component in RATIO_COMPONENT_METRICS:
+        if component in actuals_snow:
+            actuals[component] = _pad_series(actuals_snow[component])
+        elif component not in actuals:
+            actuals[component] = [None] * DASHBOARD_MONTH_COUNT
 
     looker = {
         name: {
@@ -370,6 +376,12 @@ def _build_payload(
         }
         for name in ALL_METRIC_NAMES
     }
+    for component in RATIO_COMPONENT_METRICS:
+        if component in LOOKER_LINKS:
+            looker[component] = {
+                "label": LOOKER_LINKS[component][0],
+                "url": LOOKER_LINKS[component][1],
+            }
     sources = {}
     for name in ALL_METRIC_NAMES:
         if name in METRIC_SOURCE:
@@ -379,7 +391,10 @@ def _build_payload(
                 METRIC_DATA_SOURCE.get(name, "manual"), "manual_entry"
             )
     for component in RATIO_COMPONENT_METRICS:
-        sources[component] = "manual_entry"
+        if component in RATIO_AUTO_ACTUAL_COMPONENTS:
+            sources[component] = "snowflake_validated"
+        else:
+            sources[component] = "manual_entry"
     approved_metrics = [
         n for n in ALL_METRIC_NAMES
         if n not in REVIEW_TAB_METRICS and n not in TO_DELETE_TAB_METRICS
@@ -468,6 +483,7 @@ def _build_payload(
         "yearlyTargetKey": YEARLY_TARGET_KEY,
         "ratioMetrics": RATIO_METRICS,
         "ratioComponents": RATIO_COMPONENT_METRICS,
+        "ratioAutoActualComponents": RATIO_AUTO_ACTUAL_COMPONENTS,
         "gapWeightMetrics": GAP_WEIGHT_METRICS,
         "gapAbsTargetMetrics": gap_abs_target_metrics,
         "vpAbsoluteK": vp_absolute_k,
@@ -1004,6 +1020,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       text-align: center; font-variant-numeric: tabular-nums;
     }
     .ratio-component-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 2px rgba(0,194,232,0.2); }
+    .ratio-snow-val {
+      font-size: 12px; font-weight: 700; color: var(--text);
+      font-variant-numeric: tabular-nums; padding: 4px 6px;
+      background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px;
+      min-width: 72px; text-align: center;
+    }
+    .ratio-snow-tag {
+      font-size: 7px; font-weight: 700; color: #059669;
+      text-transform: uppercase; letter-spacing: 0.04em;
+    }
     .ratio-pct-val {
       margin-top: 4px; font-size: 15px; font-weight: 700; color: var(--text);
       font-family: var(--font-ui); letter-spacing: -0.02em;
@@ -1899,6 +1925,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         + ` value="${escAttr(shown)}" placeholder="${ph}"${lockAttrs}/>`;
     }
 
+    function isRatioAutoActualComponent(component) {
+      return (CFG.ratioAutoActualComponents || []).includes(component);
+    }
+
     function ratioPerformanceCellHtml(metric, monthKey) {
       const spec = ratioMetricSpec(metric);
       const numVal = getComponentActual(spec.numerator, monthKey);
@@ -1906,9 +1936,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const ratio = getRatioActual(metric, monthKey);
       const numShown = numVal !== null ? formatTargetDisplay(spec.numerator, numVal) : "";
       const denShown = denVal !== null ? formatTargetDisplay(spec.denominator, denVal) : "";
+      const denAuto = isRatioAutoActualComponent(spec.denominator);
+      const denCell = denAuto
+        ? `<div class="ratio-input-row"><span class="ratio-lbl">SOLD UNITS</span><span class="ratio-snow-tag">Golden</span>`
+          + `<div class="ratio-snow-val">${denVal !== null ? formatTargetDisplay(spec.denominator, denVal) : "—"}</div></div>`
+        : `<div class="ratio-input-row"><span class="ratio-lbl">SOLD UNITS</span>${ratioComponentInputHtml(spec.denominator, monthKey, "actual", denShown)}</div>`;
       return `<td><div class="perf-cell-wrap ratio-cell-wrap"><div class="cell-actual yearly-month no-target ratio-input-stack">`
         + `<div class="ratio-input-row"><span class="ratio-lbl">DC UNITS</span>${ratioComponentInputHtml(spec.numerator, monthKey, "actual", numShown)}</div>`
-        + `<div class="ratio-input-row"><span class="ratio-lbl">Total Units</span>${ratioComponentInputHtml(spec.denominator, monthKey, "actual", denShown)}</div>`
+        + denCell
         + `<div class="ratio-pct-val">${ratio !== null ? formatValue(metric, ratio) : "—"}</div>`
         + `</div></div></td>`;
     }
@@ -2936,7 +2971,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               const denShown = denT === null ? "" : formatTargetInput(spec.denominator, denT);
               return `<td colspan="${months.length}" class="yearly-target-col ratio-target-col"><div class="ratio-target-grid">`
                 + `<div class="ratio-target-field"><span class="yearly-target-lbl">DC UNITS</span>${ratioComponentInputHtml(spec.numerator, yKey, "target", numShown)}</div>`
-                + `<div class="ratio-target-field"><span class="yearly-target-lbl">Total Units</span>${ratioComponentInputHtml(spec.denominator, yKey, "target", denShown)}</div>`
+                + `<div class="ratio-target-field"><span class="yearly-target-lbl">SOLD UNITS</span>${ratioComponentInputHtml(spec.denominator, yKey, "target", denShown)}</div>`
                 + `<div class="ratio-target-pct">DC Target ${ratioT !== null ? formatValue(metric, ratioT) : "—"}</div>`
                 + `</div></td>`;
             })()

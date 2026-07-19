@@ -47,6 +47,7 @@ LOOKER: dict[str, list[float | None]] = {
     "Order Frequency": [2.98, 2.85, 3.32, None, None, None],
     "Penetration Rate": [14.5, 14.3, 12.8, 15.1, 15.6, 14.8],
     "Area Product Selection": [4466, 4535, 4292, 3743, 4316, 4591],
+    "SOLD UNITS": [None, None, None, None, None, None],
     "%Fresh Food / DDE": [38.98, 38.47, 40.00, None, None, None],
     "IDQ": [97.6, 97.7, 97.70, None, None, None],
     "VSL": [74.6, 67.3, 61.0, None, None, None],
@@ -84,6 +85,7 @@ METRIC_SOURCE: dict[str, str] = {
     "Order Frequency": "snowflake_validated",
     "Penetration Rate": "snowflake_validated",
     "Area Product Selection": "snowflake_validated",
+    "SOLD UNITS": "snowflake_validated",
     "IDQ": "snowflake_validated",
     "VSL": "snowflake_validated",
     "UP-TIME >": "snowflake_validated",
@@ -658,6 +660,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
     "Order Frequency": "Order Frequency",
     "Penetration Rate": "Active Users % of Country MAU",
     "Area Product Selection": "Available Selection (Golden Selection 106615)",
+    "SOLD UNITS": "TOTAL_UNITS (Golden Growth 106613 · ISR country)",
     "VSL": "Vendor Service Level % (Golden SCM 106617 · ISR incl. DC)",
     "UP-TIME >": "Weighted Uptime %",
     "% Bad Goods Rating": "Bad Goods Rating % — Golden Store Ops 106616",
@@ -694,6 +697,7 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Order Frequency": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Penetration Rate": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Area Product Selection": ("Golden Selection — ISR (106615)", _LOOKER_GOLDEN_SELECTION),
+    "SOLD UNITS": ("Golden Growth — TOTAL_UNITS (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "%Fresh Food / DDE": ("—", ""),
     "VSL": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
     "UP-TIME >": ("Golden Store Ops — ISR (106616)", _LOOKER_GOLDEN_STORE_OPS),
@@ -1577,7 +1581,7 @@ def _round_val(name: str, value: float | None) -> float | None:
     if value is None:
         return None
     if name in ("Orders", "FTU", "Returning Clients", "Area Product Selection",
-                "Maintenance costs"):
+                "Maintenance costs", "SOLD UNITS", "DC UNITS"):
         return round(value)
     if name in ("Order Frequency", "DDE FEE/order", "OFL / order (ILS)", "Avg Units per Order",
                 "Average Goods Rating"):
@@ -1800,6 +1804,9 @@ def fetch_metrics() -> tuple[
                 i = _month_index(m)
                 data["Avg Units per Order"][i] = _round_val(
                     "Avg Units per Order", _safe_div(units, orders)
+                )
+                data["SOLD UNITS"][i] = _round_val(
+                    "SOLD UNITS", float(units) if units is not None else None
                 )
 
             cur.execute(SQL_GOLDEN_GROWTH_ACTIVE_USERS_MAU)
