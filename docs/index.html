@@ -1588,13 +1588,15 @@
       return `ΣT ${formatTargetValue(metric, totals.target)}`;
     }
 
-    function gapShowsPct(mode) {
-      return mode === "average_vs_average" || mode === "weighted_average" || mode === "gov_weighted_cumulative";
+    function gapShowsPct(mode, metric) {
+      /* avg on % metrics: one line only (pp gap). wavg/GOV: abs + relative %. */
+      if (mode === "average_vs_average") return false;
+      return mode === "weighted_average" || mode === "gov_weighted_cumulative";
     }
 
     function gapValueHtml(metric, totals) {
       const mode = gapMode(metric);
-      if (gapShowsPct(mode)) {
+      if (gapShowsPct(mode, metric)) {
         const pctTxt = formatGapPct(totals.pctGap);
         return `<div class="gap-val">${formatGapValue(metric, totals.gap, mode)}</div>`
           + (pctTxt ? `<div class="gap-val gap-pct">${escHtml(pctTxt)}</div>` : "");
