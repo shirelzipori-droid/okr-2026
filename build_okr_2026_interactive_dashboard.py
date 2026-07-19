@@ -194,8 +194,7 @@ GAP_MODES: dict[str, str] = {
 GAP_PCT_ONLY_METRICS: list[str] = list(AVERAGE_PCT_GAP_METRICS)
 
 # DC Actual (KPI by Leader): manual DC UNITS + Golden SOLD UNITS → DC%.
-# DC Target: fixed yearly 36% (read-only in Target tab).
-DC_YEARLY_TARGET_PCT = 36.0
+# DC Target: editable yearly % (default 36% in okr_2026_default_targets.py).
 DC_NUMERATOR = "DC UNITS"
 DC_DENOMINATOR = "SOLD UNITS"
 RATIO_METRICS: dict[str, dict[str, str]] = {
@@ -484,7 +483,6 @@ def _build_payload(
         "gapPctOnly": GAP_PCT_ONLY_METRICS,
         "yearlyTargetMetrics": YEARLY_TARGET_METRICS,
         "yearlyTargetKey": YEARLY_TARGET_KEY,
-        "dcYearlyTargetPct": DC_YEARLY_TARGET_PCT,
         "ratioMetrics": RATIO_METRICS,
         "ratioComponents": RATIO_COMPONENT_METRICS,
         "ratioAutoActualComponents": RATIO_AUTO_ACTUAL_COMPONENTS,
@@ -1950,7 +1948,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function getYearlyTarget(metric) {
-      if (isRatioMetric(metric)) return null;
+      if (isRatioMetric(metric) && !isYearlyTargetMetric(metric)) return null;
       const k = yearlyTargetStorageKey(metric);
       if (Object.prototype.hasOwnProperty.call(targets, k)) {
         const v = targets[k];
@@ -1960,12 +1958,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
     }
 
-    function getDcYearlyTargetPct() {
-      return Number(CFG.dcYearlyTargetPct ?? 36);
-    }
-
     function getRatioYearlyTargetPct(metric) {
-      if (metric === "DC") return getDcYearlyTargetPct();
       const yKey = CFG.yearlyTargetKey || "yearly";
       const direct = getTargetValue(metric, yKey);
       if (direct !== null) return direct;
@@ -3324,23 +3317,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       tbody.innerHTML = filteredEditMetrics().map((metric) => {
         const mIdx = editMetricsList.indexOf(metric);
         const rowCls = isManualMetric(metric) ? "manual-row" : "";
-        const cells = metric === "DC"
-          ? (() => {
-              const yt = getDcYearlyTargetPct();
-              return `<td colspan="${months.length}" class="yearly-target-col"><div class="target-only-cell yearly-target-cell ratio-target-fixed">`
-                + `<span class="yearly-target-lbl">2026 DC Target</span>`
-                + `<div class="ratio-target-pct">${formatValue("DC", yt)}</div>`
-                + `<div class="ratio-target-note">Fixed yearly target · Actual DC UNITS in KPI by Leader · SOLD UNITS from Golden</div>`
-                + `</div></td>`;
-            })()
-          : isYearlyTargetMetric(metric)
+        const cells = isYearlyTargetMetric(metric)
           ? (() => {
               const yt = getYearlyTarget(metric);
               const tgtShown = yt === null ? "" : formatTargetInput(metric, yt);
               const yKey = CFG.yearlyTargetKey || "yearly";
+              const lbl = metric === "DC" ? "2026 DC Target (%)" : "2026 target";
+              const note = metric === "DC"
+                ? `<div class="ratio-target-note">Actual DC UNITS in KPI by Leader · SOLD UNITS from Golden</div>`
+                : "";
               return `<td colspan="${months.length}" class="yearly-target-col"><div class="target-only-cell yearly-target-cell">`
-                + `<span class="yearly-target-lbl">2026 target</span>`
+                + `<span class="yearly-target-lbl">${lbl}</span>`
                 + valueInputHtml(mIdx, yKey, "target", tgtShown)
+                + note
                 + `</div></td>`;
             })()
           : months.map(monthKey => {
