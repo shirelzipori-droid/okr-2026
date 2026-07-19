@@ -1,7 +1,8 @@
-"""OKR 2026 monthly targets — from OKR target spreadsheet (Jan–Dec 2026).
+"""OKR 2026 monthly targets — embedded into the dashboard at build time.
 
-Used as dashboard defaults; user edits in the Target tab override these values
-(stored in browser localStorage).
+These are the defaults shown in the Target tab. User edits there override
+these values in browser localStorage. Gap and exports should read from the
+built dashboard (CFG.defaultTargets), not from this file directly.
 """
 from __future__ import annotations
 

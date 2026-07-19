@@ -392,7 +392,7 @@ def _build_payload(
         "monthLabels": MONTH_LABELS,
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
-        "defaultTargetsNote": "OKR 2026 target spreadsheet · Jan–Dec 2026",
+        "defaultTargetsNote": "Dashboard Target tab defaults · edit in Target tab (PIN 1618)",
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
