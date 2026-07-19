@@ -959,7 +959,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="legend">
           <span><i class="swatch-hit"></i> Gap on target</span>
           <span><i class="swatch-miss"></i> Gap off target</span>
-          <span style="color:var(--muted);">Actual (left) · Gap vs target (right)</span>
+          <span style="color:var(--muted);">Actual (left) · Gap vs target (right) · monthly only</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -982,7 +982,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="legend">
           <span><i class="swatch-hit"></i> Gap on target</span>
           <span><i class="swatch-miss"></i> Gap off target</span>
-          <span style="color:var(--muted);">Actual (left) · Gap vs target (right)</span>
+          <span style="color:var(--muted);">Actual (left) · Gap vs target (right) · monthly only</span>
         </div>
       </div>
       <div class="table-scroll">
