@@ -7,6 +7,10 @@ built dashboard (CFG.defaultTargets), not from this file directly.
 from __future__ import annotations
 
 SOLD_FROM_SELECTION_TARGET_NAME = "Sold from selection (store level)"
+YEARLY_TARGET_KEY = "yearly"
+
+# Single annual target per metric — key in flat map: f"{metric}|yearly"
+OKR_2026_YEARLY_TARGETS: dict[str, float] = {}
 
 # 12 months: Jan–Dec 2026. Synced with dashboard Target tab (Jan–Jun 2026).
 OKR_2026_TARGET_BY_METRIC: dict[str, list[float | None]] = {
@@ -52,4 +56,6 @@ def build_default_targets_flat(month_keys: list[str]) -> dict[str, float]:
             if v is None:
                 continue
             out[f"{metric}|{month}"] = float(v)
+    for metric, val in OKR_2026_YEARLY_TARGETS.items():
+        out[f"{metric}|{YEARLY_TARGET_KEY}"] = float(val)
     return out
