@@ -442,6 +442,17 @@
       display: block; font-size: 9px; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.04em; color: var(--wolt-cyan-dark); margin-bottom: 2px;
     }
+    .gap-yearly-target {
+      margin-top: 8px; padding: 8px 10px; border-radius: var(--radius-sm);
+      background: #fdf4ff; border: 1.5px solid #f5d0fe; text-align: center;
+    }
+    .gap-yearly-target .lbl {
+      display: block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; color: #9d174d; margin-bottom: 3px;
+    }
+    .gap-yearly-target .gap-yt-val {
+      font-size: 12px; font-weight: 700; color: #831843; line-height: 1.3;
+    }
     .cell-week-mini {
       padding: 6px 10px; border-radius: var(--radius-sm); text-align: center;
       background: #f0f9fc; border: 1.5px dashed var(--border);
@@ -1459,6 +1470,23 @@
       );
     }
 
+    function getYearlyTargetDisplay(metric) {
+      if (isRatioMetric(metric)) return getRatioYearlyTargetPct(metric);
+      if (isYearlyTargetMetric(metric)) return getYearlyTarget(metric);
+      return null;
+    }
+
+    function yearlyTargetMiniHtml(metric, yt) {
+      if (yt === null || yt === undefined) return "";
+      return `<div class="cell-target-mini"><span class="lbl">Yearly Target</span>${formatTargetValue(metric, yt)}</div>`;
+    }
+
+    function gapYearlyTargetBlockHtml(metric, yt) {
+      if (yt === null || yt === undefined) return "";
+      return `<div class="gap-yearly-target"><span class="lbl">Yearly Target</span>`
+        + `<div class="gap-yt-val">${formatTargetValue(metric, yt)}</div></div>`;
+    }
+
     function ratioMetricSpec(metric) {
       return (CFG.ratioMetrics || {})[metric] || null;
     }
@@ -1521,24 +1549,23 @@
       const gapTd = row.querySelector("td.gap-col");
       if (!gapTd) return;
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
+      const ytBlock = isYearlyTargetMetric(metric)
+        ? gapYearlyTargetBlockHtml(metric, getYearlyTargetDisplay(metric))
+        : "";
       const totals = computeSelectionGap(metric, months);
       if (!totals || totals.gap === null || totals.gap === undefined) {
-        gapTd.innerHTML = `<div class="cell-gap empty">—</div>`;
+        gapTd.innerHTML = `<div class="cell-gap empty">—</div>${ytBlock}`;
         return;
       }
       const met = meetsTarget(totals.actual, totals.target, metric);
       const cls = met ? "hit" : "miss";
       const ref = gapReferenceLabel(metric, months, totals);
       const periodLbl = selectedPeriodLabel(months);
-      const ytRef = isYearlyTargetMetric(metric)
-        ? `<div class="gap-ref">YT ${formatTargetValue(metric, totals.target)}</div>`
-        : "";
       gapTd.innerHTML = `<div class="cell-gap ${cls}">`
         + gapValueHtml(metric, totals)
         + `<div class="gap-ref">${escHtml(periodLbl)}</div>`
         + (ref ? `<div class="gap-ref">${escHtml(ref)}</div>` : "")
-        + ytRef
-        + `</div>`;
+        + `</div>${ytBlock}`;
     }
 
     function updateDcRatioDisplay(monthKey, inp) {
@@ -1695,9 +1722,7 @@
       } else {
         pctWrapCls += " no-target";
       }
-      const ytHtml = yt !== null
-        ? `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, yt)}</div>`
-        : "";
+      const ytHtml = yt !== null ? yearlyTargetMiniHtml(metric, yt) : "";
       return `<td><div class="perf-cell-wrap ratio-cell-wrap"><div class="cell-actual yearly-month ratio-input-stack">`
         + `<div class="ratio-input-row ratio-units-row"><span class="ratio-lbl">DC UNITS · manual</span>${ratioComponentInputHtml(spec.numerator, monthKey, "actual", numShown)}</div>`
         + `<div class="${pctWrapCls}"><span class="ratio-lbl">DC Actual %</span><div class="ratio-pct-val">${ratio !== null ? formatValue(metric, ratio) : "—"}</div>${ytHtml}</div>`
@@ -2155,10 +2180,10 @@
 
     function gapReferenceLabel(metric, monthKeys, totals) {
       if (isRatioMetric(metric) && totals) {
-        return `Σ ${formatInteger(totals.numSum)} / ${formatInteger(totals.denSum)} = ${formatValue(metric, totals.actual)} vs YT ${formatValue(metric, totals.target)}`;
+        return `Σ ${formatInteger(totals.numSum)} / ${formatInteger(totals.denSum)} = ${formatValue(metric, totals.actual)} vs Yearly Target ${formatValue(metric, totals.target)}`;
       }
       if (isYearlyTargetMetric(metric)) {
-        return `Actual ${formatTargetValue(metric, totals.actual)} vs YT ${formatTargetValue(metric, totals.target)}`;
+        return `Actual ${formatTargetValue(metric, totals.actual)} vs Yearly Target ${formatTargetValue(metric, totals.target)}`;
       }
       const mode = gapMode(metric);
       if (!totals) return "";
@@ -2212,10 +2237,12 @@
         ? formatTargetDisplay(metric, override)
         : "";
       const yt = getYearlyTarget(metric);
-      let cls = "cell-actual yearly-month";
+      const targetHtml = yearlyTargetMiniHtml(metric, yt);
       if (actual === null && !manual) {
-        return `<td colspan="${monthCount}" class="yearly-target-col"><div class="cell-actual no-actual yearly-month">—</div></td>`;
+        return `<td colspan="${monthCount}" class="yearly-target-col"><div class="perf-cell-wrap">`
+          + `<div class="cell-actual no-actual yearly-month">—</div>${targetHtml}</div></td>`;
       }
+      let cls = "cell-actual yearly-month";
       if (yt !== null && actual !== null) {
         cls += meetsTarget(actual, yt, metric) ? " hit" : " miss";
         cls += " has-target";
@@ -2225,10 +2252,7 @@
       const actualHtml = (manual && mIdx !== undefined)
         ? actualInlineInputHtml(metric, mIdx, yKey, actualShown)
         : `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
-      const targetHtml = yt !== null
-        ? `<div class="cell-target-mini"><span class="lbl">YT</span>${formatTargetValue(metric, yt)}</div>`
-        : "";
-      return `<td colspan="${monthCount}" class="yearly-target-col"><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}${targetHtml}</div></div></td>`;
+      return `<td colspan="${monthCount}" class="yearly-target-col"><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}</div>${targetHtml}</div></td>`;
     }
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
@@ -2255,23 +2279,24 @@
     }
 
     function gapPerformanceCellHtml(metric, monthKeys) {
+      const yt = getYearlyTargetDisplay(metric);
+      const ytBlock = isYearlyTargetMetric(metric) ? gapYearlyTargetBlockHtml(metric, yt) : "";
       const totals = computeSelectionGap(metric, monthKeys);
       if (!totals || totals.gap === null || totals.gap === undefined) {
+        if (ytBlock) {
+          return `<td class="gap-col"><div class="cell-gap empty">—</div>${ytBlock}</td>`;
+        }
         return `<td class="gap-col"><div class="cell-gap empty">—</div></td>`;
       }
       const met = meetsTarget(totals.actual, totals.target, metric);
       const cls = met ? "hit" : "miss";
       const ref = gapReferenceLabel(metric, monthKeys, totals);
       const periodLbl = selectedPeriodLabel(monthKeys);
-      const ytRef = isYearlyTargetMetric(metric)
-        ? `<div class="gap-ref">YT ${formatTargetValue(metric, totals.target)}</div>`
-        : "";
       return `<td class="gap-col"><div class="cell-gap ${cls}">`
         + gapValueHtml(metric, totals)
         + `<div class="gap-ref">${escHtml(periodLbl)}</div>`
         + (ref ? `<div class="gap-ref">${escHtml(ref)}</div>` : "")
-        + ytRef
-        + `</div></td>`;
+        + `</div>${ytBlock}</td>`;
     }
 
     function formatTargetValue(metric, value) {
@@ -2829,12 +2854,13 @@
         const cells = isYearlyTargetMetric(metric)
           ? (() => {
               const yt = getYearlyTarget(metric);
-              const tgtShown = yt === null ? "" : formatTargetInput(metric, yt);
+              const ytDisplay = metric === "DC" ? getRatioYearlyTargetPct(metric) : yt;
+              const tgtShown = ytDisplay === null ? "" : formatTargetInput(metric, ytDisplay);
               const yKey = CFG.yearlyTargetKey || "yearly";
-              const lbl = metric === "DC" ? "2026 DC Target (%)" : "2026 target";
+              const lbl = metric === "DC" ? "Yearly Target (%)" : "Yearly Target";
               const note = metric === "DC"
                 ? `<div class="ratio-target-note">Actual DC UNITS in KPI by Leader · SOLD UNITS from Golden</div>`
-                : "";
+                : `<div class="ratio-target-note">Single annual target · one Actual cell in KPI by Leader</div>`;
               return `<td colspan="${months.length}" class="yearly-target-col"><div class="target-only-cell yearly-target-cell">`
                 + `<span class="yearly-target-lbl">${lbl}</span>`
                 + valueInputHtml(mIdx, yKey, "target", tgtShown)
