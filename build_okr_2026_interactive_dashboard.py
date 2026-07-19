@@ -139,10 +139,10 @@ METRIC_DIRECTION: dict[str, str] = {
     "Early Attrition (0-3) <": "lower",
 }
 
-# Gap vs target display mode per metric (configure metric-by-metric).
-# "absolute" = actual − target for the month
-# "cumulative_absolute" = sum(actual − target) from first selected month through this month
-# "vs_average" = actual − average target across selected months
+# Gap vs target: one cumulative column for the selected period filter (month chips).
+# "cumulative_absolute" = sum(actual − target) across selected months (Orders)
+# "absolute" = same sum for selected period until configured per metric
+# "vs_average" = last selected month actual − average target in period
 GAP_MODE_DEFAULT = "absolute"
 GAP_MODES: dict[str, str] = {
     "Orders": "cumulative_absolute",
@@ -668,8 +668,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
     th.gap-col {
       font-size: 12px; font-weight: 700; font-family: var(--font-ui);
-      letter-spacing: 0.04em; vertical-align: middle; padding: 8px 5px;
-      min-width: 68px; background: #eef9fc;
+      letter-spacing: 0.04em; vertical-align: middle; padding: 8px 8px;
+      min-width: 88px; width: 88px; background: #eef9fc;
     }
     th.gap-col .th-sub { color: #007a94; }
     th.gap-divider, td.gap-divider {
@@ -786,7 +786,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .cell-actual.no-target { border-style: dashed; opacity: 0.92; }
     .actual-val { font-size: 15px; font-weight: 700; line-height: 1.2; font-family: var(--font-ui); letter-spacing: -0.02em; }
     .cell-gap {
-      border-radius: var(--radius-sm); padding: 5px 4px; min-width: 64px; min-height: 44px;
+      border-radius: var(--radius-sm); padding: 8px 6px; min-width: 80px; min-height: 52px;
       background: #f8fdff; border: 1px solid #c2eef8;
       box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;
     }
@@ -952,7 +952,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="legend">
           <span><i class="swatch-hit"></i> Gap on target</span>
           <span><i class="swatch-miss"></i> Gap off target</span>
-          <span style="color:var(--muted);">Gap column · monthly view only</span>
+          <span style="color:var(--muted);">One cumulative Gap column per selected period</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -975,7 +975,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="legend">
           <span><i class="swatch-hit"></i> Gap on target</span>
           <span><i class="swatch-miss"></i> Gap off target</span>
-          <span style="color:var(--muted);">Gap column · monthly view only</span>
+          <span style="color:var(--muted);">One cumulative Gap column per selected period</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -1764,59 +1764,37 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
-    function cumulativeTotalsThrough(metric, monthKey, monthKeys) {
+    function selectionTotals(metric, monthKeys) {
       const ordered = monthKeys.slice().sort();
-      const endIdx = ordered.indexOf(monthKey);
-      if (endIdx < 0) return null;
       let actualSum = 0;
       let targetSum = 0;
-      for (let i = 0; i <= endIdx; i++) {
-        const mk = ordered[i];
+      let used = 0;
+      for (const mk of ordered) {
         const idx = monthIndex(mk);
         const actual = getActual(metric, idx);
         const target = getTarget(metric, mk);
-        if (actual !== null) actualSum += actual;
-        if (target !== null) targetSum += target;
+        if (actual === null || target === null) continue;
+        actualSum += actual;
+        targetSum += target;
+        used += 1;
       }
-      const monthIdx = monthIndex(monthKey);
-      const monthActual = getActual(metric, monthIdx);
-      const monthTarget = getTarget(metric, monthKey);
-      if (monthActual === null || monthTarget === null) return null;
-      return { actual: actualSum, target: targetSum, gap: actualSum - targetSum };
+      if (!used) return null;
+      return { actual: actualSum, target: targetSum, gap: actualSum - targetSum, months: used };
     }
 
-    function computeGap(metric, monthKey, monthKeys) {
+    function computeSelectionGap(metric, monthKeys) {
       const mode = gapMode(metric);
-      if (mode === "cumulative_absolute") {
-        const cum = cumulativeTotalsThrough(metric, monthKey, monthKeys);
-        return cum ? cum.gap : null;
-      }
-      const idx = monthIndex(monthKey);
-      const actual = getActual(metric, idx);
-      const target = getTarget(metric, monthKey);
-      if (actual === null) return null;
       if (mode === "vs_average") {
-        const avg = averageTargetForMetric(metric, monthKeys);
-        if (avg === null) return null;
-        return actual - avg;
-      }
-      if (target === null) return null;
-      return actual - target;
-    }
-
-    function gapComparisonTotals(metric, monthKey, monthKeys) {
-      const mode = gapMode(metric);
-      const idx = monthIndex(monthKey);
-      const actual = getActual(metric, idx);
-      const target = getTarget(metric, monthKey);
-      if (mode === "cumulative_absolute") return cumulativeTotalsThrough(metric, monthKey, monthKeys);
-      if (mode === "vs_average") {
+        const ordered = monthKeys.slice().sort();
+        if (!ordered.length) return null;
+        const lastKey = ordered[ordered.length - 1];
+        const idx = monthIndex(lastKey);
+        const actual = getActual(metric, idx);
         const avg = averageTargetForMetric(metric, monthKeys);
         if (actual === null || avg === null) return null;
-        return { actual, target: avg, gap: actual - avg };
+        return { actual, target: avg, gap: actual - avg, months: 1 };
       }
-      if (actual === null || target === null) return null;
-      return { actual, target, gap: actual - target };
+      return selectionTotals(metric, monthKeys);
     }
 
     function formatGapValue(metric, gap) {
@@ -1826,28 +1804,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return txt;
     }
 
-    function performanceCellMet(metric, monthKey, monthKeys, actual, target) {
-      const totals = gapComparisonTotals(metric, monthKey, monthKeys);
-      if (totals) return meetsTarget(totals.actual, totals.target, metric);
-      if (actual !== null && target !== null) return meetsTarget(actual, target, metric);
-      return null;
+    function selectedPeriodLabel(monthKeys) {
+      if (!monthKeys.length) return "";
+      const ordered = monthKeys.slice().sort();
+      const first = CFG.monthLabels[monthIndex(ordered[0])];
+      const last = CFG.monthLabels[monthIndex(ordered[ordered.length - 1])];
+      return first === last ? first : `${first}–${last}`;
     }
 
-    function gapReferenceLabel(metric, monthKey, monthKeys) {
+    function gapReferenceLabel(metric, monthKeys, totals) {
       const mode = gapMode(metric);
+      if (!totals) return "";
       if (mode === "vs_average") {
-        const avg = averageTargetForMetric(metric, monthKeys);
-        if (avg === null) return "";
-        return `Avg ${formatTargetValue(metric, avg)}`;
+        return `Avg ${formatTargetValue(metric, totals.target)}`;
       }
-      if (mode === "cumulative_absolute") {
-        const cum = cumulativeTotalsThrough(metric, monthKey, monthKeys);
-        if (!cum) return "";
-        return `ΣT ${formatTargetValue(metric, cum.target)}`;
-      }
-      const target = getTarget(metric, monthKey);
-      if (target === null) return "";
-      return `T ${formatTargetValue(metric, target)}`;
+      return `ΣT ${formatTargetValue(metric, totals.target)}`;
     }
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
@@ -1867,21 +1838,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">${actualHtml}</div>${targetHtml}</div></td>`;
     }
 
-    function gapPerformanceCellHtml(metric, monthKey, monthKeys) {
-      const gap = computeGap(metric, monthKey, monthKeys);
-      if (gap === null) {
+    function gapPerformanceCellHtml(metric, monthKeys) {
+      const totals = computeSelectionGap(metric, monthKeys);
+      if (!totals || totals.gap === null || totals.gap === undefined) {
         return `<td class="gap-col"><div class="cell-gap empty">—</div></td>`;
       }
-      const totals = gapComparisonTotals(metric, monthKey, monthKeys);
-      const met = totals ? meetsTarget(totals.actual, totals.target, metric) : null;
+      const met = meetsTarget(totals.actual, totals.target, metric);
       const cls = met ? "hit" : "miss";
-      const ref = gapReferenceLabel(metric, monthKey, monthKeys);
-      const modeLbl = gapMode(metric) === "cumulative_absolute"
-        ? `<div class="gap-ref">YTD</div>`
-        : "";
+      const ref = gapReferenceLabel(metric, monthKeys, totals);
+      const periodLbl = selectedPeriodLabel(monthKeys);
       return `<td class="gap-col"><div class="cell-gap ${cls}">`
-        + `<div class="gap-val">${formatGapValue(metric, gap)}</div>`
-        + modeLbl
+        + `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`
+        + `<div class="gap-ref">${escHtml(periodLbl)}</div>`
         + (ref ? `<div class="gap-ref">${escHtml(ref)}</div>` : "")
         + `</div></td>`;
     }
@@ -2161,7 +2129,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         }).join("")
           + (showGap
             ? `<td class="gap-divider" aria-hidden="true"></td>`
-              + months.map(monthKey => gapPerformanceCellHtml(metric, monthKey, months)).join("")
+              + gapPerformanceCellHtml(metric, months)
             : "");
         let rowCls = manual ? "manual-row" : "";
         if (wf === "cancelled") rowCls = (rowCls ? rowCls + " " : "") + "row-cancelled";
@@ -2175,11 +2143,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metrics.some(m => isWeeklyMode(m));
     }
 
-    function gapModeForTableLabel(metrics) {
-      if ((metrics || []).some(m => gapMode(m) === "cumulative_absolute")) return "Gap · YTD";
-      return "Gap";
-    }
-
     function renderPerformanceTableHead(tableId, metrics) {
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
       const thead = document.querySelector(`#${tableId} thead`);
@@ -2187,7 +2150,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const anyWeekly = tableUsesWeeklyHeaders(metrics || []);
       const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
       const showGap = !anyWeekly;
-      const gapSub = gapModeForTableLabel(metrics);
+      const periodLbl = selectedPeriodLabel(months);
       const actualHeaders = anyWeekly
         ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week</span></th>`).join("")
         : months.map(k => {
@@ -2196,10 +2159,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           }).join("");
       const gapHeaders = showGap
         ? `<th class="gap-divider" aria-hidden="true"></th>`
-          + months.map(k => {
-              const i = monthIndex(k);
-              return `<th class="gap-col">${CFG.monthLabels[i]}<span class="th-sub">${gapSub}</span></th>`;
-            }).join("")
+          + `<th class="gap-col">Gap<span class="th-sub">${escHtml(periodLbl)} · cumulative</span></th>`
         : "";
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + actualHeaders + gapHeaders + "</tr>";
