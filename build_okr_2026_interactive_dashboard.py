@@ -146,6 +146,36 @@ METRIC_DIRECTION: dict[str, str] = {
 # "gov_weighted_cumulative" = Σ(VP actual K) − Σ(VP target K) — display in K ILS only
 # "absolute" = sum(actual − target) for selected period (default until configured)
 GAP_MODE_DEFAULT = "absolute"
+# Average gap + display relative % only (no absolute pp/units line).
+AVERAGE_PCT_GAP_METRICS: list[str] = [
+    "UPH >",
+    "Area Product Selection",
+    "%Fresh Food / DDE",
+    "IDQ",
+    "VSL",
+    "DC",
+    "Forecast accuracy +/-",
+    "New Stores",
+    "Expansion",
+    "Relocation",
+    "Maintenance costs",
+    "Utilities costs reduce",
+    "Fulfillment & Drive partner",
+    "3PFL GOV (yearly)",
+    "Turning B stores to A",
+    "Avg Units per Order",
+    "Order Frequency",
+    "Penetration Rate",
+    "Awareness",
+    "IDP & HQ training",
+    "Internal Mobility",
+    "OPS Training",
+    "Store employees absence <",
+    "Early Attrition (0-3) <",
+    "Engagme >1 (HV)",
+    "Engagme >1 (HQ)",
+    "EngagMe growth",
+]
 GAP_MODES: dict[str, str] = {
     "Orders": "cumulative_absolute",
     "DDE FEE/order": "weighted_average",
@@ -158,14 +188,10 @@ GAP_MODES: dict[str, str] = {
     "POFR%": "average_vs_average",
     "Under 45min >": "average_vs_average",
     "UP-TIME >": "average_vs_average",
-    "UPH >": "average_vs_average",
-    "Area Product Selection": "average_vs_average",
     "Attrition (monthly) <": "average_vs_average",
+    **{m: "average_vs_average" for m in AVERAGE_PCT_GAP_METRICS},
 }
-GAP_PCT_ONLY_METRICS: list[str] = [
-    "UPH >",
-    "Area Product Selection",
-]
+GAP_PCT_ONLY_METRICS: list[str] = list(AVERAGE_PCT_GAP_METRICS)
 
 # Metrics whose Target tab accepts only a single annual target (not monthly).
 YEARLY_TARGET_KEY = "yearly"
