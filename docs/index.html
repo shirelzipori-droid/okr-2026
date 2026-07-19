@@ -290,9 +290,9 @@
       min-width: 76px;
     }
     th.gap-col {
-      font-size: 12px; font-weight: 700; font-family: var(--font-ui);
-      letter-spacing: 0.04em; vertical-align: middle; padding: 8px 8px;
-      min-width: 88px; width: 88px; background: #eef9fc;
+      font-size: 13px; font-weight: 700; font-family: var(--font-ui);
+      letter-spacing: 0.04em; vertical-align: middle; padding: 10px 10px;
+      min-width: 128px; width: 128px; background: #eef9fc;
     }
     th.gap-col .th-sub { color: #007a94; }
     th.gap-divider, td.gap-divider {
@@ -301,7 +301,7 @@
       border-left: 2px solid var(--wolt-cyan-dark);
       vertical-align: middle;
     }
-    td.gap-col { vertical-align: middle; }
+    td.gap-col { vertical-align: middle; min-width: 128px; width: 128px; padding: 10px 8px; }
     th.month-col .th-sub, .edit-sub {
       display: block; font-size: 12px; font-weight: 600; text-transform: none;
       letter-spacing: 0.02em; margin-top: 4px; color: var(--muted);
@@ -411,7 +411,7 @@
     .cell-actual.no-target { border-style: dashed; opacity: 0.92; }
     .actual-val { font-size: 15px; font-weight: 700; line-height: 1.2; font-family: var(--font-ui); letter-spacing: -0.02em; }
     .cell-gap {
-      border-radius: var(--radius-sm); padding: 8px 6px; min-width: 80px; min-height: 52px;
+      border-radius: var(--radius-sm); padding: 10px 8px; min-width: 112px; width: 100%; min-height: 52px;
       background: #f8fdff; border: 1px solid #c2eef8;
       box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;
     }
@@ -422,9 +422,9 @@
       background: var(--hit-bg) !important; border: 2px solid var(--hit-border) !important; color: var(--hit-text);
     }
     .cell-gap.empty { color: #94a3b8; font-style: italic; font-size: 12px; border-style: dashed; }
-    .gap-val { font-size: 14px; font-weight: 700; line-height: 1.15; font-family: var(--font-ui); letter-spacing: -0.02em; }
+    .gap-val { font-size: 15px; font-weight: 700; line-height: 1.15; font-family: var(--font-ui); letter-spacing: -0.02em; }
     .gap-ref {
-      font-size: 9px; font-weight: 600; color: var(--muted); margin-top: 2px; line-height: 1.2;
+      font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 3px; line-height: 1.25;
       text-transform: uppercase; letter-spacing: 0.03em;
     }
     .cell-gap.hit .gap-ref, .cell-gap.miss .gap-ref { opacity: 0.85; }
