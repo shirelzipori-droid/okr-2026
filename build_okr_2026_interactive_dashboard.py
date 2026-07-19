@@ -903,6 +903,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       text-align: center; font-variant-numeric: tabular-nums;
     }
     .actual-inline-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 3px rgba(0,194,232,0.2); }
+    .cell-actual.hit .actual-inline-input {
+      background: var(--hit-bg); border: 2px solid var(--hit-border); color: var(--hit-text);
+    }
+    .cell-actual.miss .actual-inline-input {
+      background: var(--miss-bg); border: 2px solid var(--miss-border); color: var(--miss-text);
+    }
+    .cell-actual.yearly-month .actual-inline-input {
+      background: #fff; border: 1px solid var(--border); color: var(--text);
+    }
     .target-only-cell { display: flex; align-items: center; justify-content: center; min-height: 52px; }
     .edit-cell-stack { display: flex; flex-direction: column; gap: 8px; align-items: center; min-height: 52px; justify-content: center; }
     .cell-actual.miss .target-val { color: #fca5a5; }
@@ -1059,7 +1068,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         <div class="legend">
           <span><i class="swatch-hit"></i> On target</span>
           <span><i class="swatch-miss"></i> Missed</span>
-          <span style="color:var(--muted);">+ cumulative Gap column</span>
+          <span style="color:var(--muted);">Monthly cells + Gap column · Yearly targets: Gap only</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -2168,10 +2177,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const cls = met ? "hit" : "miss";
       const ref = gapReferenceLabel(metric, monthKeys, totals);
       const periodLbl = selectedPeriodLabel(monthKeys);
+      const ytRef = isYearlyTargetMetric(metric)
+        ? `<div class="gap-ref">YT ${formatTargetValue(metric, totals.target)}</div>`
+        : "";
       return `<td class="gap-col"><div class="cell-gap ${cls}">`
         + gapValueHtml(metric, totals)
         + `<div class="gap-ref">${escHtml(periodLbl)}</div>`
         + (ref ? `<div class="gap-ref">${escHtml(ref)}</div>` : "")
+        + ytRef
         + `</div></td>`;
     }
 
