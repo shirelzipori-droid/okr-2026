@@ -1589,8 +1589,9 @@
     }
 
     function gapShowsPct(mode, metric) {
-      /* avg on % metrics: one line only (pp gap). wavg/GOV: abs + relative %. */
+      /* % metrics (PPM, Shrink, …): one pp gap line only. DDE/VP: abs + relative %. */
       if (mode === "average_vs_average") return false;
+      if (isPercentMetric(metric) && mode === "weighted_average") return false;
       return mode === "weighted_average" || mode === "gov_weighted_cumulative";
     }
 
