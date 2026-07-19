@@ -181,32 +181,32 @@ METRIC_FORMAT: dict[str, str] = {
     "Orders": "integer",
     "DDE FEE/order": "decimal:1",
     "FTU": "integer",
-    "FTU Conversion": "percent:2",
+    "FTU Conversion": "percent:1",
     "Returning Clients": "integer",
-    "Returning Client Conversion": "percent:2",
+    "Returning Client Conversion": "percent:1",
     "PPM%": "percent:1",
-    "Shrink/DDE FEE": "percent:2",
+    "Shrink/DDE FEE": "percent:1",
     "OFL / order (ILS)": "decimal:1",
     "VP%": "percent:1",
     "VP (K ILS)": "integer",
     "Weighted Availability": "percent:1",
     "KVI & Promo WA%": "percent:1",
-    "Sold from selection — sold_from_selection_perc": "percent:2",
-    "Sold from selection — sold_from_product_selection_perc": "percent:2",
-    SOLD_FROM_SELECTION_PROMOTED_NAME: "percent:2",
+    "Sold from selection — sold_from_selection_perc": "percent:1",
+    "Sold from selection — sold_from_product_selection_perc": "percent:1",
+    SOLD_FROM_SELECTION_PROMOTED_NAME: "percent:1",
     "POFR%": "percent:1",
     "Under 45min >": "percent:1",
     "Maintenance costs": "integer",
     "Avg Units per Order": "decimal:1",
-    "Order Frequency": "decimal:2",
+    "Order Frequency": "decimal:1",
     "Penetration Rate": "percent:1",
     "Area Product Selection": "integer",
-    "%Fresh Food / DDE": "percent:2",
-    "IDQ": "percent:2",
+    "%Fresh Food / DDE": "percent:1",
+    "IDQ": "percent:1",
     "VSL": "percent:1",
     "UP-TIME >": "percent:1",
-    "% Bad Goods Rating": "percent:2",
-    "Average Goods Rating": "decimal:2",
+    "% Bad Goods Rating": "percent:1",
+    "Average Goods Rating": "decimal:1",
     "New Stores": "integer",
     "Expansion": "integer",
     "Relocation": "integer",
@@ -347,7 +347,7 @@ def _build_payload(
         for key, spec in SOLD_FROM_SELECTION_VARIANTS.items()
     }
     format_map = {m: _default_format(m) for m in ALL_METRIC_NAMES}
-    format_map[SOLD_FROM_SELECTION_PROMOTED_NAME] = "percent:2"
+    format_map[SOLD_FROM_SELECTION_PROMOTED_NAME] = "percent:1"
     default_owners = {
         **DEFAULT_OWNERS,
         SOLD_FROM_SELECTION_PROMOTED_NAME: {"leader": "CAT & Content", "partner": ""},
@@ -1607,10 +1607,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function isPercentMetric(metric) { return metricFormat(metric).startsWith("percent"); }
 
     function actualDecimals(metric) {
-      const spec = metricFormat(metric);
-      if (spec.startsWith("percent:")) return parseInt(spec.split(":")[1], 10) || 1;
-      if (spec.startsWith("decimal:")) return parseInt(spec.split(":")[1], 10) || 1;
-      return 0;
+      /* All non-integer metrics display with exactly one decimal place. */
+      return metricFormat(metric) === "integer" ? 0 : 1;
     }
 
     function formatDisplay(metric, value, forTarget) {
@@ -1618,12 +1616,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const n = Number(value);
       if (!Number.isFinite(n)) return "—";
       const spec = metricFormat(metric);
+      const d = actualDecimals(metric);
       if (spec.startsWith("percent")) {
-        const d = forTarget ? 2 : (parseInt(spec.split(":")[1], 10) || 1);
         return n.toFixed(d) + "%";
       }
       if (spec === "integer") return String(Math.round(n));
-      const d = forTarget ? 2 : (parseInt(spec.split(":")[1], 10) || 1);
       return n.toFixed(d);
     }
 
@@ -1633,13 +1630,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (!Number.isFinite(n)) return "";
       const spec = metricFormat(metric);
       if (spec === "integer") return String(Math.round(n));
-      return n.toFixed(2);
+      const d = actualDecimals(metric);
+      return n.toFixed(d) + (spec.startsWith("percent") ? "%" : "");
     }
 
     function targetPlaceholder(metric) {
-      if (isPercentMetric(metric)) return "0.00";
+      if (isPercentMetric(metric)) return "0.0";
       if (metricFormat(metric) === "integer") return "0";
-      return "0.00";
+      return "0.0";
     }
 
     function parseTargetRaw(raw) {
@@ -1665,7 +1663,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (metric === "Shrink/DDE FEE") n = Math.abs(n);
       const spec = metricFormat(metric);
       if (spec === "integer") return String(Math.round(n));
-      const s = n.toFixed(2);
+      const s = n.toFixed(actualDecimals(metric));
       return targetUsesPlusSign(metric) ? "+" + s : s;
     }
 
