@@ -815,21 +815,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       min-width: 76px;
     }
     th.gap-col {
-      font-size: 13px; font-weight: 700; font-family: var(--font-ui);
-      letter-spacing: 0.04em; vertical-align: middle; padding: 10px 10px;
-      min-width: 128px; width: 128px;
+      font-size: 12px; font-weight: 700; font-family: var(--font-ui);
+      letter-spacing: 0.03em; vertical-align: middle; padding: 10px 12px;
+      min-width: 172px; width: 172px; line-height: 1.3; white-space: normal;
       background: linear-gradient(180deg, #007a94 0%, #005f73 100%);
       color: #fff;
       border-bottom: 2px solid #004d5c;
     }
-    th.gap-col .th-sub { color: rgba(255, 255, 255, 0.88); }
+    th.gap-col .th-sub { color: rgba(255, 255, 255, 0.92); margin-top: 4px; }
     th.gap-divider, td.gap-divider {
       width: 5px; min-width: 5px; max-width: 5px; padding: 0;
       background: var(--wolt-cyan-muted);
       border-left: 2px solid var(--wolt-cyan-dark);
       vertical-align: middle;
     }
-    td.gap-col { vertical-align: middle; min-width: 128px; width: 128px; padding: 10px 8px; }
+    td.gap-col { vertical-align: middle; min-width: 172px; width: 172px; padding: 10px 10px; }
     th.month-col .th-sub, .edit-sub {
       display: block; font-size: 12px; font-weight: 600; text-transform: none;
       letter-spacing: 0.02em; margin-top: 4px; color: var(--muted);
@@ -3203,16 +3203,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metrics.some(m => isWeeklyMode(m));
     }
 
-    function gapHeaderSubLabel(metrics, monthKeys) {
-      const periodLbl = selectedPeriodLabel(monthKeys);
-      const modes = new Set((metrics || []).map(m => gapMode(m)));
-      const parts = [];
-      if (modes.has("weighted_average")) parts.push("wavg");
-      if (modes.has("average_vs_average")) parts.push("avg");
-      if (modes.has("cumulative_absolute")) parts.push("cumulative");
-      if (modes.has("gov_weighted_cumulative")) parts.push("GOV");
-      if (!parts.length) parts.push("cumulative");
-      return `${periodLbl} · ${parts.join(" / ")}`;
+    function gapHeaderPeriodLabel(monthKeys) {
+      return selectedPeriodLabel(monthKeys);
     }
 
     function renderPerformanceTableHead(tableId, metrics) {
@@ -3222,7 +3214,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const anyWeekly = tableUsesWeeklyHeaders(metrics || []);
       const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
       const showGap = !anyWeekly;
-      const gapSub = gapHeaderSubLabel(metrics, months);
+      const gapPeriod = gapHeaderPeriodLabel(months);
       const actualHeaders = anyWeekly
         ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week</span></th>`).join("")
         : months.map(k => {
@@ -3231,7 +3223,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           }).join("");
       const gapHeaders = showGap
         ? `<th class="gap-divider" aria-hidden="true"></th>`
-          + `<th class="gap-col">Gap<span class="th-sub">${escHtml(gapSub)}</span></th>`
+          + `<th class="gap-col">Cumulative Gap<span class="th-sub">${escHtml(gapPeriod)}</span></th>`
         : "";
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + actualHeaders + gapHeaders + "</tr>";
