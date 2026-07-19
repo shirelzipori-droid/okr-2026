@@ -139,13 +139,14 @@ METRIC_DIRECTION: dict[str, str] = {
     "Early Attrition (0-3) <": "lower",
 }
 
-# Gap vs target: one cumulative column for the selected period filter (month chips).
-# "cumulative_absolute" = sum(actual − target) across selected months (Orders)
-# "absolute" = same sum for selected period until configured per metric
-# "vs_average" = last selected month actual − average target in period
+# Gap vs target: one column for the selected period filter (month chips).
+# "cumulative_absolute" = sum(actual) − sum(target) across selected months (Orders)
+# "average_vs_average" = avg(actual) − avg(target); show abs + % change (DDE FEE/order)
+# "absolute" = sum(actual − target) for selected period (default until configured)
 GAP_MODE_DEFAULT = "absolute"
 GAP_MODES: dict[str, str] = {
     "Orders": "cumulative_absolute",
+    "DDE FEE/order": "average_vs_average",
 }
 
 METRIC_HINTS: dict[str, str] = {
@@ -803,6 +804,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
     .cell-gap.empty { color: #94a3b8; font-style: italic; font-size: 12px; border-style: dashed; }
     .gap-val { font-size: 15px; font-weight: 700; line-height: 1.15; font-family: var(--font-ui); letter-spacing: -0.02em; }
+    .gap-val.gap-pct { font-size: 12px; font-weight: 700; margin-top: 3px; opacity: 0.95; }
     .gap-ref {
       font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 3px; line-height: 1.25;
       text-transform: uppercase; letter-spacing: 0.03em;
@@ -1769,6 +1771,28 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return vals.reduce((a, b) => a + b, 0) / vals.length;
     }
 
+    function averageCompareTotals(metric, monthKeys) {
+      const ordered = monthKeys.slice().sort();
+      let actualSum = 0;
+      let targetSum = 0;
+      let used = 0;
+      for (const mk of ordered) {
+        const idx = monthIndex(mk);
+        const actual = getActual(metric, idx);
+        const target = getTarget(metric, mk);
+        if (actual === null || target === null) continue;
+        actualSum += actual;
+        targetSum += target;
+        used += 1;
+      }
+      if (!used) return null;
+      const avgActual = actualSum / used;
+      const avgTarget = targetSum / used;
+      const gap = avgActual - avgTarget;
+      const pctGap = avgTarget !== 0 ? (gap / avgTarget) * 100 : null;
+      return { actual: avgActual, target: avgTarget, gap, pctGap, months: used };
+    }
+
     function selectionTotals(metric, monthKeys) {
       const ordered = monthKeys.slice().sort();
       let actualSum = 0;
@@ -1789,16 +1813,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function computeSelectionGap(metric, monthKeys) {
       const mode = gapMode(metric);
-      if (mode === "vs_average") {
-        const ordered = monthKeys.slice().sort();
-        if (!ordered.length) return null;
-        const lastKey = ordered[ordered.length - 1];
-        const idx = monthIndex(lastKey);
-        const actual = getActual(metric, idx);
-        const avg = averageTargetForMetric(metric, monthKeys);
-        if (actual === null || avg === null) return null;
-        return { actual, target: avg, gap: actual - avg, months: 1 };
-      }
+      if (mode === "average_vs_average") return averageCompareTotals(metric, monthKeys);
       return selectionTotals(metric, monthKeys);
     }
 
@@ -1807,6 +1822,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       let txt = formatDisplay(metric, gap, false);
       if (gap > 0) txt = "+" + txt;
       return txt;
+    }
+
+    function formatGapPct(pct) {
+      if (pct === null || pct === undefined || !Number.isFinite(pct)) return "";
+      const sign = pct > 0 ? "+" : "";
+      return sign + pct.toFixed(1) + "%";
     }
 
     function selectedPeriodLabel(monthKeys) {
@@ -1820,10 +1841,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function gapReferenceLabel(metric, monthKeys, totals) {
       const mode = gapMode(metric);
       if (!totals) return "";
-      if (mode === "vs_average") {
-        return `Avg ${formatTargetValue(metric, totals.target)}`;
+      if (mode === "average_vs_average") {
+        return `Avg ${formatTargetValue(metric, totals.actual)} vs ${formatTargetValue(metric, totals.target)}`;
+      }
+      if (mode === "cumulative_absolute") {
+        return `ΣT ${formatTargetValue(metric, totals.target)}`;
       }
       return `ΣT ${formatTargetValue(metric, totals.target)}`;
+    }
+
+    function gapValueHtml(metric, totals) {
+      const mode = gapMode(metric);
+      if (mode === "average_vs_average") {
+        const pctTxt = formatGapPct(totals.pctGap);
+        return `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`
+          + (pctTxt ? `<div class="gap-val gap-pct">${escHtml(pctTxt)}</div>` : "");
+      }
+      return `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`;
     }
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
@@ -1858,7 +1892,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const ref = gapReferenceLabel(metric, monthKeys, totals);
       const periodLbl = selectedPeriodLabel(monthKeys);
       return `<td class="gap-col"><div class="cell-gap ${cls}">`
-        + `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`
+        + gapValueHtml(metric, totals)
         + `<div class="gap-ref">${escHtml(periodLbl)}</div>`
         + (ref ? `<div class="gap-ref">${escHtml(ref)}</div>` : "")
         + `</div></td>`;
@@ -2158,6 +2192,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metrics.some(m => isWeeklyMode(m));
     }
 
+    function gapHeaderSubLabel(metrics, monthKeys) {
+      const periodLbl = selectedPeriodLabel(monthKeys);
+      const modes = new Set((metrics || []).map(m => gapMode(m)));
+      if (modes.has("average_vs_average") && modes.has("cumulative_absolute")) {
+        return `${periodLbl} · avg / cumulative`;
+      }
+      if (modes.has("average_vs_average")) return `${periodLbl} · avg`;
+      if (modes.has("cumulative_absolute")) return `${periodLbl} · cumulative`;
+      return `${periodLbl} · cumulative`;
+    }
+
     function renderPerformanceTableHead(tableId, metrics) {
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
       const thead = document.querySelector(`#${tableId} thead`);
@@ -2165,7 +2210,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const anyWeekly = tableUsesWeeklyHeaders(metrics || []);
       const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
       const showGap = !anyWeekly;
-      const periodLbl = selectedPeriodLabel(months);
+      const gapSub = gapHeaderSubLabel(metrics, months);
       const actualHeaders = anyWeekly
         ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week</span></th>`).join("")
         : months.map(k => {
@@ -2174,7 +2219,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           }).join("");
       const gapHeaders = showGap
         ? `<th class="gap-divider" aria-hidden="true"></th>`
-          + `<th class="gap-col">Gap<span class="th-sub">${escHtml(periodLbl)} · cumulative</span></th>`
+          + `<th class="gap-col">Gap<span class="th-sub">${escHtml(gapSub)}</span></th>`
         : "";
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + actualHeaders + gapHeaders + "</tr>";
