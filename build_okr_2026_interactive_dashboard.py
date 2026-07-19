@@ -206,9 +206,15 @@ RATIO_AUTO_ACTUAL_COMPONENTS: list[str] = [DC_DENOMINATOR]
 # Metrics whose Target tab accepts only a single annual target (not monthly).
 YEARLY_TARGET_KEY = "yearly"
 YEARLY_TARGET_METRICS: list[str] = [
-    "New special vendors or categories",
+    "New Stores",
+    "Expansion",
+    "Relocation",
     "Utilities costs reduce",
+    "Fulfillment & Drive partner",
+    "3PFL GOV (yearly)",
+    "Turning B stores to A",
     "Awareness",
+    "New special vendors or categories",
     "IDP & HQ training",
     "Internal Mobility",
     "OPS Training",
@@ -1948,6 +1954,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return (CFG.yearlyTargetMetrics || []).includes(metric);
     }
 
+    function isYearlySingleCellMetric(metric) {
+      return isYearlyTargetMetric(metric) && !isRatioMetric(metric);
+    }
+
     function yearlyTargetStorageKey(metric) {
       return cellKey(metric, CFG.yearlyTargetKey || "yearly");
     }
@@ -2342,7 +2352,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function getActual(metric, idx) {
       const monthKey = CFG.monthKeys[idx];
       if (isRatioMetric(metric)) return getRatioActual(metric, monthKey);
-      if (isYearlyTargetMetric(metric)) return getYearlyActual(metric);
+      if (isYearlySingleCellMetric(metric)) return getYearlyActual(metric);
       const k = cellKey(metric, monthKey);
       if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "")
         return Number(actualOverrides[k]);
@@ -2611,7 +2621,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function computeSelectionGap(metric, monthKeys) {
       if (isRatioMetric(metric)) return ratioGapTotals(metric, monthKeys);
-      if (isYearlyTargetMetric(metric)) return yearlyTargetGapTotals(metric, monthKeys);
+      if (isYearlySingleCellMetric(metric)) return yearlyTargetGapTotals(metric, monthKeys);
       const mode = gapMode(metric);
       if (mode === "gov_weighted_cumulative") return govWeightedCumulativeTotals(metric, monthKeys);
       if (mode === "weighted_average") return weightedCompareTotals(metric, monthKeys);
@@ -2749,15 +2759,6 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
       if (isRatioMetric(metric)) return ratioPerformanceCellHtml(metric, monthKey);
-      if (isYearlyTargetMetric(metric)) {
-        if (actual === null && !manual) {
-          return `<td><div class="cell-actual no-actual yearly-month">—</div></td>`;
-        }
-        const actualHtml = (manual && mIdx !== undefined)
-          ? actualInlineInputHtml(metric, mIdx, monthKey, actualShown)
-          : `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
-        return `<td><div class="perf-cell-wrap"><div class="cell-actual yearly-month no-target">${actualHtml}</div></div></td>`;
-      }
       if (actual === null && !manual && target === null) {
         return `<td><div class="cell-actual no-actual">—</div></td>`;
       }
@@ -3105,7 +3106,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               }
               const monthKey = weekKey.slice(0, 7);
               if (isRatioMetric(metric)) return ratioPerformanceCellHtml(metric, monthKey);
-              if (isYearlyTargetMetric(metric)) {
+              if (isYearlySingleCellMetric(metric)) {
                 return `<td><div class="cell-actual no-actual yearly-month">—</div></td>`;
               }
               const idx = monthIndex(monthKey);
@@ -3127,7 +3128,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                 + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
                 + `</div>${targetHtml}</div></td>`;
             }).join("")
-          : isYearlyTargetMetric(metric)
+          : isYearlySingleCellMetric(metric)
           ? yearlyActualCellHtml(metric, months.length, manual, mIdx)
             + (showGap
               ? `<td class="gap-divider" aria-hidden="true"></td>`
