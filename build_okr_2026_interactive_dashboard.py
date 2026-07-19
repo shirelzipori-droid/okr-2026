@@ -163,6 +163,7 @@ GAP_MODES: dict[str, str] = {
 }
 GAP_PCT_ONLY_METRICS: list[str] = [
     "UPH >",
+    "Area Product Selection",
 ]
 
 # Metrics whose Target tab accepts only a single annual target (not monthly).
