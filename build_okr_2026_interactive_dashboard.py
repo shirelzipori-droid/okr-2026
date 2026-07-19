@@ -676,7 +676,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       width: 5px; min-width: 5px; max-width: 5px; padding: 0;
       background: var(--wolt-cyan-muted);
       border-left: 2px solid var(--wolt-cyan-dark);
+      vertical-align: middle;
     }
+    td.gap-col { vertical-align: middle; }
     th.month-col .th-sub, .edit-sub {
       display: block; font-size: 12px; font-weight: 600; text-transform: none;
       letter-spacing: 0.02em; margin-top: 4px; color: var(--muted);
@@ -950,9 +952,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="panel-head">
         <h2>Main KPIs — Actual vs Target</h2>
         <div class="legend">
-          <span><i class="swatch-hit"></i> Gap on target</span>
-          <span><i class="swatch-miss"></i> Gap off target</span>
-          <span style="color:var(--muted);">One cumulative Gap column per selected period</span>
+          <span><i class="swatch-hit"></i> On target</span>
+          <span><i class="swatch-miss"></i> Below target (or above for cost metrics)</span>
+          <span style="color:var(--muted);">+ cumulative Gap column</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -973,9 +975,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="panel-head">
         <h2>KPI by Leader</h2>
         <div class="legend">
-          <span><i class="swatch-hit"></i> Gap on target</span>
-          <span><i class="swatch-miss"></i> Gap off target</span>
-          <span style="color:var(--muted);">One cumulative Gap column per selected period</span>
+          <span><i class="swatch-hit"></i> On target</span>
+          <span><i class="swatch-miss"></i> Missed</span>
+          <span style="color:var(--muted);">+ cumulative Gap column</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -1825,6 +1827,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (actual === null && !manual && target === null) {
         return `<td><div class="cell-actual no-actual">—</div></td>`;
       }
+      const met = actual !== null && target !== null ? meetsTarget(actual, target, metric) : null;
+      let cls = "cell-actual";
+      if (target === null) cls += " no-target";
+      else if (actual !== null) { cls += met ? " hit" : " miss"; cls += " has-target"; }
+      else cls += " no-target has-target";
       let actualHtml = "";
       if (manual && mIdx !== undefined) {
         actualHtml = actualInlineInputHtml(metric, mIdx, monthKey, actualShown);
@@ -1835,7 +1842,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (target !== null) {
         targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
       }
-      return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">${actualHtml}</div>${targetHtml}</div></td>`;
+      return `<td><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}</div>${targetHtml}</div></td>`;
     }
 
     function gapPerformanceCellHtml(metric, monthKeys) {
@@ -2108,11 +2115,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               if (actual === null && !manual && target === null) {
                 return `<td><div class="cell-actual no-actual">—</div></td>`;
               }
+              const met = actual !== null ? meetsTarget(actual, target, metric) : null;
+              let cls = "cell-actual";
+              if (target === null) cls += " no-target";
+              else if (actual !== null) { cls += met ? " hit" : " miss"; cls += " has-target"; }
+              else cls += " no-target has-target";
               let targetHtml = "";
               if (target !== null) {
                 targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
               }
-              return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">`
+              return `<td><div class="perf-cell-wrap"><div class="${cls}">`
                 + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
                 + `</div>${targetHtml}</div></td>`;
             }).join("")
