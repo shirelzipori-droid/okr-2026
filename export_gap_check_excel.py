@@ -9,7 +9,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 DASHBOARD_HTML = ROOT / "auto_outputs" / "okr_2026_interactive_dashboard.html"
-OUT_XLSX = ROOT / "auto_outputs" / "okr_2026_gap_check.xlsx"
+OUT_XLSX = ROOT / "auto_outputs" / "okr_2026_gap_check_latest.xlsx"
 
 
 def _load_dashboard_cfg() -> dict:
@@ -232,12 +232,6 @@ def main() -> None:
         pd.DataFrame(monthly_rows).to_excel(writer, sheet_name="Monthly Actual+Target", index=False)
         pd.DataFrame(gap_rows).to_excel(writer, sheet_name="Gap Summary Jan-Jun", index=False)
         pd.DataFrame(vp_rows).to_excel(writer, sheet_name="VP Detail", index=False)
-        pd.DataFrame([{
-            "Source": "auto_outputs/okr_2026_interactive_dashboard.html",
-            "Actuals": "CFG.actuals (same as dashboard Main KPIs)",
-            "Targets": "CFG.defaultTargets (same as dashboard Target tab defaults)",
-            "Note": "Browser Target-tab overrides (localStorage) are NOT in this file",
-        }]).to_excel(writer, sheet_name="Source", index=False)
 
     print("Wrote", OUT_XLSX.name)
 
