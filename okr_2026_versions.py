@@ -28,9 +28,19 @@ SNAPSHOTS: dict[str, OkrSnapshot] = {
             "PIN-protected Target editing (1618), Jan–Jun 2026 actuals"
         ),
     ),
+    "V1": OkrSnapshot(
+        code="V1",
+        tag="okr-2026-v1",
+        date="2026-07-19",
+        notes=(
+            "Before Yearly Target UI labels: yearly metrics with single Target/Actual "
+            "cells (Exp/HR/Marketing/CAT/SC), editable DC yearly % + manual DC UNITS, "
+            "Robotic store removed"
+        ),
+    ),
 }
 
-CURRENT_SNAPSHOT = "V0"
+CURRENT_SNAPSHOT = "V1"
 
 
 def get_snapshot(code: str) -> OkrSnapshot:
