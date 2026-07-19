@@ -153,7 +153,6 @@ AVERAGE_PCT_GAP_METRICS: list[str] = [
     "%Fresh Food / DDE",
     "IDQ",
     "VSL",
-    "DC",
     "Forecast accuracy +/-",
     "New Stores",
     "Expansion",
@@ -193,10 +192,19 @@ GAP_MODES: dict[str, str] = {
 }
 GAP_PCT_ONLY_METRICS: list[str] = list(AVERAGE_PCT_GAP_METRICS)
 
+# DC = DC UNITS ÷ Total Units (manual ratio · yearly target).
+DC_NUMERATOR = "DC UNITS"
+DC_DENOMINATOR = "Total Units"
+RATIO_METRICS: dict[str, dict[str, str]] = {
+    "DC": {"numerator": DC_NUMERATOR, "denominator": DC_DENOMINATOR},
+}
+RATIO_COMPONENT_METRICS: list[str] = [DC_NUMERATOR, DC_DENOMINATOR]
+
 # Metrics whose Target tab accepts only a single annual target (not monthly).
 YEARLY_TARGET_KEY = "yearly"
 YEARLY_TARGET_METRICS: list[str] = [
     "New special vendors or categories",
+    "DC",
 ]
 GAP_WEIGHT_METRICS: dict[str, str] = {
     "DDE FEE/order": "Orders",
@@ -214,6 +222,9 @@ METRIC_HINTS: dict[str, str] = {
     "Returning Clients": "Thousands (K)",
     "VSL": "ISR country incl. DC",
     "VP (K ILS)": "Variable Profit · K ILS (Monthly Plan)",
+    "DC UNITS": "Units through DC (manual)",
+    "Total Units": "Total units (manual)",
+    "DC": "DC UNITS ÷ Total Units",
 }
 
 # Display format: percent | integer | decimal:N (N = decimal places for actuals)
@@ -257,7 +268,9 @@ METRIC_FORMAT: dict[str, str] = {
     "Turning B stores to A": "integer",
     "Awareness": "percent:1",
     "New special vendors or categories": "integer",
-    "DC": "integer",
+    "DC UNITS": "integer",
+    "Total Units": "integer",
+    "DC": "percent:1",
     "Forecast accuracy +/-": "percent:1",
     "UPH >": "decimal:1",
     "Attrition (monthly) <": "percent:1",
@@ -365,6 +378,8 @@ def _build_payload(
             sources[name] = SOURCE_LABEL.get(
                 METRIC_DATA_SOURCE.get(name, "manual"), "manual_entry"
             )
+    for component in RATIO_COMPONENT_METRICS:
+        sources[component] = "manual_entry"
     approved_metrics = [
         n for n in ALL_METRIC_NAMES
         if n not in REVIEW_TAB_METRICS and n not in TO_DELETE_TAB_METRICS
@@ -387,10 +402,15 @@ def _build_payload(
         for key, spec in SOLD_FROM_SELECTION_VARIANTS.items()
     }
     format_map = {m: _default_format(m) for m in ALL_METRIC_NAMES}
+    for component in RATIO_COMPONENT_METRICS:
+        format_map[component] = METRIC_FORMAT.get(component, "integer")
+    format_map["DC"] = METRIC_FORMAT["DC"]
     format_map[SOLD_FROM_SELECTION_PROMOTED_NAME] = "percent:1"
     default_owners = {
         **DEFAULT_OWNERS,
         SOLD_FROM_SELECTION_PROMOTED_NAME: {"leader": "CAT & Content", "partner": ""},
+        DC_NUMERATOR: {"leader": "SC", "partner": ""},
+        DC_DENOMINATOR: {"leader": "SC", "partner": ""},
     }
     default_targets = build_default_targets_flat(MONTH_KEYS)
     default_selected_months = _default_selected_month_keys(actuals_snow)
@@ -446,6 +466,8 @@ def _build_payload(
         "gapPctOnly": GAP_PCT_ONLY_METRICS,
         "yearlyTargetMetrics": YEARLY_TARGET_METRICS,
         "yearlyTargetKey": YEARLY_TARGET_KEY,
+        "ratioMetrics": RATIO_METRICS,
+        "ratioComponents": RATIO_COMPONENT_METRICS,
         "gapWeightMetrics": GAP_WEIGHT_METRICS,
         "gapAbsTargetMetrics": gap_abs_target_metrics,
         "vpAbsoluteK": vp_absolute_k,
@@ -965,6 +987,35 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .cell-actual.yearly-month {
       background: #fafafa;
       border-color: #e5e7eb;
+    }
+    .ratio-cell-wrap { min-width: 108px; }
+    .ratio-input-stack { gap: 4px; padding: 6px 4px; width: 100%; }
+    .ratio-input-row {
+      display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%;
+    }
+    .ratio-lbl {
+      font-size: 8px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--muted);
+    }
+    .ratio-component-input {
+      width: 100%; max-width: 96px; min-width: 72px;
+      background: #fff; border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); padding: 4px 6px; font-size: 12px; font-weight: 700;
+      text-align: center; font-variant-numeric: tabular-nums;
+    }
+    .ratio-component-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 2px rgba(0,194,232,0.2); }
+    .ratio-pct-val {
+      margin-top: 4px; font-size: 15px; font-weight: 700; color: var(--text);
+      font-family: var(--font-ui); letter-spacing: -0.02em;
+    }
+    .ratio-target-grid {
+      display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; align-items: flex-start;
+      padding: 8px 12px;
+    }
+    .ratio-target-field { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 120px; }
+    .ratio-target-pct {
+      flex: 1 1 100%; text-align: center; font-size: 13px; font-weight: 700;
+      color: #9d174d; padding-top: 4px;
     }
     .save-toast {
       position: fixed; bottom: 24px; right: 24px;
@@ -1744,6 +1795,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function getYearlyTarget(metric) {
+      if (isRatioMetric(metric)) return null;
       const k = yearlyTargetStorageKey(metric);
       if (Object.prototype.hasOwnProperty.call(targets, k)) {
         const v = targets[k];
@@ -1753,12 +1805,163 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
     }
 
+    function ratioMetricSpec(metric) {
+      return (CFG.ratioMetrics || {})[metric] || null;
+    }
+
+    function isRatioMetric(metric) {
+      return !!ratioMetricSpec(metric);
+    }
+
+    function ratioComponentParent(component) {
+      const specs = CFG.ratioMetrics || {};
+      for (const parent of Object.keys(specs)) {
+        const spec = specs[parent];
+        if (spec.numerator === component || spec.denominator === component) return parent;
+      }
+      return null;
+    }
+
+    function computeRatioPct(numerator, denominator) {
+      if (numerator === null || denominator === null) return null;
+      const n = Number(numerator);
+      const d = Number(denominator);
+      if (!Number.isFinite(n) || !Number.isFinite(d) || d === 0) return null;
+      return 100 * n / d;
+    }
+
+    function getTargetValue(metric, monthKey) {
+      const k = cellKey(metric, monthKey);
+      if (Object.prototype.hasOwnProperty.call(targets, k)) {
+        const v = targets[k];
+        if (v === null || v === "") return null;
+        return Number(v);
+      }
+      return getDefaultTarget(metric, monthKey);
+    }
+
+    function getComponentActual(component, monthKey) {
+      const k = cellKey(component, monthKey);
+      if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "") {
+        return Number(actualOverrides[k]);
+      }
+      const idx = monthIndex(monthKey);
+      const row = CFG.actuals[component];
+      if (!row || idx < 0 || row[idx] === null || row[idx] === undefined) return null;
+      return Number(row[idx]);
+    }
+
+    function getRatioActual(metric, monthKey) {
+      const spec = ratioMetricSpec(metric);
+      if (!spec) return null;
+      return computeRatioPct(
+        getComponentActual(spec.numerator, monthKey),
+        getComponentActual(spec.denominator, monthKey),
+      );
+    }
+
+    function setRatioComponentValue(component, monthKey, kind, raw, finalize) {
+      const parent = ratioComponentParent(component);
+      const storageMonth = (kind === "target" && parent && isYearlyTargetMetric(parent))
+        ? (CFG.yearlyTargetKey || "yearly")
+        : monthKey;
+      const k = cellKey(component, storageMonth);
+      const trimmed = String(raw).trim();
+      if (kind === "target") {
+        if (!isTargetEditUnlocked()) return;
+        if (trimmed === "") {
+          if (getDefaultTarget(component, storageMonth) !== null) targets[k] = null;
+          else delete targets[k];
+        } else {
+          const n = parseTargetRaw(trimmed);
+          if (n === null) { if (!finalize) return; return; }
+          targets[k] = normalizeTargetValue(component, n);
+        }
+        if (finalize) saveTargets(true);
+        else persistDraft();
+        return;
+      }
+      if (trimmed === "") delete actualOverrides[k];
+      else {
+        const n = parseTargetRaw(trimmed);
+        if (n === null) { if (!finalize) return; return; }
+        actualOverrides[k] = n;
+      }
+      if (finalize) saveActuals(true);
+      else persistDraft();
+    }
+
+    function ratioComponentInputHtml(component, monthKey, kind, shown) {
+      const ph = targetPlaceholder(component);
+      const lockAttrs = (kind === "target" && !isTargetEditUnlocked()) ? ' readonly tabindex="-1"' : "";
+      return `<input type="text" inputmode="decimal" class="ratio-component-input value-input" data-kind="${kind}"`
+        + ` data-ratio-component="${escAttr(component)}" data-month="${escAttr(monthKey)}"`
+        + ` value="${escAttr(shown)}" placeholder="${ph}"${lockAttrs}/>`;
+    }
+
+    function ratioPerformanceCellHtml(metric, monthKey) {
+      const spec = ratioMetricSpec(metric);
+      const numVal = getComponentActual(spec.numerator, monthKey);
+      const denVal = getComponentActual(spec.denominator, monthKey);
+      const ratio = getRatioActual(metric, monthKey);
+      const numShown = numVal !== null ? formatTargetDisplay(spec.numerator, numVal) : "";
+      const denShown = denVal !== null ? formatTargetDisplay(spec.denominator, denVal) : "";
+      return `<td><div class="perf-cell-wrap ratio-cell-wrap"><div class="cell-actual yearly-month no-target ratio-input-stack">`
+        + `<div class="ratio-input-row"><span class="ratio-lbl">DC UNITS</span>${ratioComponentInputHtml(spec.numerator, monthKey, "actual", numShown)}</div>`
+        + `<div class="ratio-input-row"><span class="ratio-lbl">Total Units</span>${ratioComponentInputHtml(spec.denominator, monthKey, "actual", denShown)}</div>`
+        + `<div class="ratio-pct-val">${ratio !== null ? formatValue(metric, ratio) : "—"}</div>`
+        + `</div></div></td>`;
+    }
+
+    function ratioGapTotals(metric, monthKeys) {
+      const spec = ratioMetricSpec(metric);
+      if (!spec) return null;
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const targetNum = getTargetValue(spec.numerator, yKey);
+      const targetDen = getTargetValue(spec.denominator, yKey);
+      const targetPct = computeRatioPct(targetNum, targetDen);
+      if (targetPct === null) return null;
+      let numSum = 0;
+      let denSum = 0;
+      let used = 0;
+      for (const mk of monthKeys.slice().sort()) {
+        const n = getComponentActual(spec.numerator, mk);
+        const d = getComponentActual(spec.denominator, mk);
+        if (n === null || d === null) continue;
+        numSum += n;
+        denSum += d;
+        used += 1;
+      }
+      if (!used || !denSum) return null;
+      const actualPct = computeRatioPct(numSum, denSum);
+      const gap = actualPct - targetPct;
+      const pctGap = targetPct !== 0 ? (gap / targetPct) * 100 : null;
+      return {
+        actual: actualPct,
+        target: targetPct,
+        gap,
+        pctGap,
+        months: used,
+        ratio: true,
+        numSum,
+        denSum,
+        targetNum,
+        targetDen,
+      };
+    }
+
     function countTargets() {
       let n = 0;
       const metrics = editMetricsList.length
         ? editMetricsList
         : [...(CFG.mainMetrics || []), ...(CFG.leaderMetrics || [])];
       metrics.forEach(metric => {
+        if (isRatioMetric(metric)) {
+          const spec = ratioMetricSpec(metric);
+          const yKey = CFG.yearlyTargetKey || "yearly";
+          if (getTargetValue(spec.numerator, yKey) !== null && getTargetValue(spec.denominator, yKey) !== null) n++;
+          return;
+        }
         if (isYearlyTargetMetric(metric)) {
           if (getYearlyTarget(metric) !== null) n++;
           return;
@@ -1824,6 +2027,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function getActual(metric, idx) {
       const monthKey = CFG.monthKeys[idx];
+      if (isRatioMetric(metric)) return getRatioActual(metric, monthKey);
       const k = cellKey(metric, monthKey);
       if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "")
         return Number(actualOverrides[k]);
@@ -1837,6 +2041,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function setActualIdx(idx, monthKey, raw, finalize) {
       const metric = metricByIdx(editMetricsList, idx);
+      if (isRatioMetric(metric)) return;
       const k = cellKey(metric, monthKey);
       const trimmed = String(raw).trim();
       if (trimmed === "") { delete actualOverrides[k]; }
@@ -1850,6 +2055,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function finalizeActualInput(inp) {
+      if (inp.dataset.ratioComponent) {
+        const component = inp.dataset.ratioComponent;
+        const n = parseTargetRaw(inp.value);
+        if (n !== null) inp.value = formatTargetDisplay(component, n);
+        setRatioComponentValue(component, inp.dataset.month, inp.dataset.kind, inp.value, true);
+        return;
+      }
       const idx = Number(inp.dataset.idx);
       const metric = metricByIdx(editMetricsList, idx);
       const n = parseTargetRaw(inp.value);
@@ -1893,6 +2105,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function finalizeTargetInput(inp) {
+      if (inp.dataset.ratioComponent) {
+        const component = inp.dataset.ratioComponent;
+        const n = parseTargetRaw(inp.value);
+        if (n !== null) inp.value = formatTargetInput(component, normalizeTargetValue(component, n));
+        setRatioComponentValue(component, inp.dataset.month, "target", inp.value, true);
+        return;
+      }
       const idx = Number(inp.dataset.idx);
       const metric = metricByIdx(editMetricsList, idx);
       const n = parseTargetRaw(inp.value);
@@ -2066,6 +2285,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function computeSelectionGap(metric, monthKeys) {
+      if (isRatioMetric(metric)) return ratioGapTotals(metric, monthKeys);
       if (isYearlyTargetMetric(metric)) return yearlyTargetGapTotals(metric, monthKeys);
       const mode = gapMode(metric);
       if (mode === "gov_weighted_cumulative") return govWeightedCumulativeTotals(metric, monthKeys);
@@ -2125,6 +2345,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function gapReferenceLabel(metric, monthKeys, totals) {
+      if (isRatioMetric(metric) && totals) {
+        return `Σ ${formatInteger(totals.numSum)} / ${formatInteger(totals.denSum)} = ${formatValue(metric, totals.actual)} vs YT ${formatValue(metric, totals.target)}`;
+      }
       if (isYearlyTargetMetric(metric)) {
         return `Σ ${formatTargetValue(metric, totals.actual)} vs YT ${formatTargetValue(metric, totals.target)}`;
       }
@@ -2147,7 +2370,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function gapPctOnly(metric) {
-      return (CFG.gapPctOnly || []).includes(metric);
+      return (CFG.gapPctOnly || []).includes(metric) || isRatioMetric(metric);
     }
 
     function gapShowsPct(mode, metric) {
@@ -2173,6 +2396,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
+      if (isRatioMetric(metric)) return ratioPerformanceCellHtml(metric, monthKey);
       if (isYearlyTargetMetric(metric)) {
         if (actual === null && !manual) {
           return `<td><div class="cell-actual no-actual yearly-month">—</div></td>`;
@@ -2471,6 +2695,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
                   + `</div></div></td>`;
               }
               const monthKey = weekKey.slice(0, 7);
+              if (isRatioMetric(metric)) return ratioPerformanceCellHtml(metric, monthKey);
               const idx = monthIndex(monthKey);
               const actual = getActual(metric, idx);
               if (isYearlyTargetMetric(metric)) {
@@ -2659,6 +2884,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       inp.addEventListener("input", () => {
         clearTimeout(debounce);
         debounce = setTimeout(() => {
+          if (inp.dataset.ratioComponent) {
+            setRatioComponentValue(inp.dataset.ratioComponent, inp.dataset.month, inp.dataset.kind, inp.value, false);
+            return;
+          }
           const idx = Number(inp.dataset.idx);
           if (inp.dataset.kind === "actual") setActualIdx(idx, inp.dataset.month, inp.value, false);
           else setTargetIdx(idx, inp.dataset.month, inp.value, false);
@@ -2679,7 +2908,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const thead = document.querySelector("#editTable thead");
       const tbody = document.querySelector("#editTable tbody");
       const focused = activeTargetInput
-        ? { idx: activeTargetInput.dataset.idx, month: activeTargetInput.dataset.month, kind: activeTargetInput.dataset.kind }
+        ? {
+            ratioComponent: activeTargetInput.dataset.ratioComponent || "",
+            idx: activeTargetInput.dataset.idx,
+            month: activeTargetInput.dataset.month,
+            kind: activeTargetInput.dataset.kind,
+          }
         : null;
 
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
@@ -2691,7 +2925,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       tbody.innerHTML = filteredEditMetrics().map((metric) => {
         const mIdx = editMetricsList.indexOf(metric);
         const rowCls = isManualMetric(metric) ? "manual-row" : "";
-        const cells = isYearlyTargetMetric(metric)
+        const cells = (isRatioMetric(metric) && isYearlyTargetMetric(metric))
+          ? (() => {
+              const yKey = CFG.yearlyTargetKey || "yearly";
+              const spec = ratioMetricSpec(metric);
+              const numT = getTargetValue(spec.numerator, yKey);
+              const denT = getTargetValue(spec.denominator, yKey);
+              const ratioT = computeRatioPct(numT, denT);
+              const numShown = numT === null ? "" : formatTargetInput(spec.numerator, numT);
+              const denShown = denT === null ? "" : formatTargetInput(spec.denominator, denT);
+              return `<td colspan="${months.length}" class="yearly-target-col ratio-target-col"><div class="ratio-target-grid">`
+                + `<div class="ratio-target-field"><span class="yearly-target-lbl">DC UNITS</span>${ratioComponentInputHtml(spec.numerator, yKey, "target", numShown)}</div>`
+                + `<div class="ratio-target-field"><span class="yearly-target-lbl">Total Units</span>${ratioComponentInputHtml(spec.denominator, yKey, "target", denShown)}</div>`
+                + `<div class="ratio-target-pct">DC Target ${ratioT !== null ? formatValue(metric, ratioT) : "—"}</div>`
+                + `</div></td>`;
+            })()
+          : isYearlyTargetMetric(metric)
           ? (() => {
               const yt = getYearlyTarget(metric);
               const tgtShown = yt === null ? "" : formatTargetInput(metric, yt);
@@ -2715,7 +2964,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
       tbody.querySelectorAll(".value-input").forEach(inp => {
         bindValueInput(inp);
-        if (focused && inp.dataset.idx === focused.idx && inp.dataset.month === focused.month && inp.dataset.kind === focused.kind) {
+        const matchRatio = focused && focused.ratioComponent
+          && inp.dataset.ratioComponent === focused.ratioComponent
+          && inp.dataset.month === focused.month
+          && inp.dataset.kind === focused.kind;
+        const matchIdx = focused && !focused.ratioComponent
+          && inp.dataset.idx === focused.idx
+          && inp.dataset.month === focused.month
+          && inp.dataset.kind === focused.kind;
+        if (matchRatio || matchIdx) {
           inp.focus();
           const len = inp.value.length;
           inp.setSelectionRange(len, len);

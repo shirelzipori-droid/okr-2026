@@ -81,7 +81,7 @@ OKR_METRICS: list[MetricRow] = [
     {"name": "%Fresh Food / DDE", "leader": "CAT & Content", "partner": "", "source": "manual", "workflow": "manual"},
     {"name": "IDQ", "leader": "CAT & Content", "partner": "", "source": "snowflake", "workflow": "auto"},
     {"name": "VSL", "leader": "CAT & Content", "partner": "SC", "source": "snowflake", "workflow": "auto"},
-    {"name": "DC", "leader": "SC", "partner": "", "source": "manual", "workflow": "pending_send"},
+    {"name": "DC", "leader": "SC", "partner": "", "source": "manual", "workflow": "yearly"},
     {"name": "Forecast accuracy +/-", "leader": "SC", "partner": "", "source": "manual", "workflow": "pending_impl"},
     {"name": "UP-TIME >", "leader": "OPS", "partner": "", "source": "snowflake", "workflow": "auto"},
     {"name": "UPH >", "leader": "OPS", "partner": "SC", "source": "manual", "workflow": "pending_impl"},
