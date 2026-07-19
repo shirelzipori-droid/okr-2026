@@ -1973,11 +1973,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metric;
     }
 
+    function performanceSignedGap(metric, gap) {
+      if (gap === null || gap === undefined || !Number.isFinite(gap)) return gap;
+      /* Display: + = better than budget, − = miss (flip for lower-is-better). */
+      return direction(metric) === "lower" ? -gap : gap;
+    }
+
     function formatGapValue(metric, gap, mode) {
       if (gap === null) return "—";
+      const signed = performanceSignedGap(metric, gap);
       const fmtMetric = gapFormatMetric(metric, mode || gapMode(metric));
-      let txt = formatDisplay(fmtMetric, gap, false);
-      if (gap > 0) txt = "+" + txt;
+      let txt = formatDisplay(fmtMetric, Math.abs(signed), false);
+      if (signed > 0) txt = "+" + txt;
+      else if (signed < 0) txt = "−" + txt;
       return txt;
     }
 
@@ -2029,7 +2037,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function gapValueHtml(metric, totals) {
       const mode = gapMode(metric);
       if (gapShowsPct(mode, metric)) {
-        const pctTxt = formatGapPct(totals.pctGap);
+        const pctTxt = formatGapPct(performanceSignedGap(metric, totals.pctGap));
         return `<div class="gap-val">${formatGapValue(metric, totals.gap, mode)}</div>`
           + (pctTxt ? `<div class="gap-val gap-pct">${escHtml(pctTxt)}</div>` : "");
       }
