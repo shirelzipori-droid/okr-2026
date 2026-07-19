@@ -160,6 +160,7 @@ GAP_MODES: dict[str, str] = {
     "UP-TIME >": "average_vs_average",
     "UPH >": "average_vs_average",
     "Area Product Selection": "average_vs_average",
+    "Attrition (monthly) <": "average_vs_average",
 }
 GAP_PCT_ONLY_METRICS: list[str] = [
     "UPH >",
