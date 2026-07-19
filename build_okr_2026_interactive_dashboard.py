@@ -978,6 +978,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .gap-yearly-target .gap-yt-val {
       font-size: 12px; font-weight: 700; color: #831843; line-height: 1.3;
     }
+    .gap-yearly-target.gap-yt-empty {
+      opacity: 0.85; border-style: dashed; background: #fafafa;
+    }
+    .gap-yearly-target.gap-yt-empty .gap-yt-val { color: var(--muted); font-weight: 600; }
+    th.yearly-target-head {
+      min-width: 108px; background: #fdf4ff; color: #9d174d;
+      border-left: 2px solid #f5d0fe;
+    }
+    .yearly-row-note {
+      font-size: 11px; color: #9d174d; font-weight: 600; padding: 10px 8px; text-align: center;
+    }
     .cell-week-mini {
       padding: 6px 10px; border-radius: var(--radius-sm); text-align: center;
       background: #f0f9fc; border: 1.5px dashed var(--border);
@@ -1973,7 +1984,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function getYearlyTarget(metric) {
-      if (isRatioMetric(metric) && !isYearlyTargetMetric(metric)) return null;
+      if (isRatioMetric(metric)) return null;
       const k = yearlyTargetStorageKey(metric);
       if (Object.prototype.hasOwnProperty.call(targets, k)) {
         const v = targets[k];
@@ -1997,8 +2008,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function getYearlyTargetDisplay(metric) {
       if (isRatioMetric(metric)) return getRatioYearlyTargetPct(metric);
-      if (isYearlyTargetMetric(metric)) return getYearlyTarget(metric);
-      return null;
+      return getYearlyTarget(metric);
     }
 
     function yearlyTargetMiniHtml(metric, yt) {
@@ -2007,9 +2017,21 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function gapYearlyTargetBlockHtml(metric, yt) {
-      if (yt === null || yt === undefined) return "";
-      return `<div class="gap-yearly-target"><span class="lbl">Yearly Target</span>`
-        + `<div class="gap-yt-val">${formatTargetValue(metric, yt)}</div></div>`;
+      const hasVal = yt !== null && yt !== undefined;
+      const valHtml = hasVal ? formatTargetValue(metric, yt) : "—";
+      const emptyCls = hasVal ? "" : " gap-yt-empty";
+      return `<div class="gap-yearly-target${emptyCls}"><span class="lbl">Yearly Target</span>`
+        + `<div class="gap-yt-val">${valHtml}</div></div>`;
+    }
+
+    function yearlyTargetEditCellHtml(mIdx, metric) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const yt = getYearlyTargetDisplay(metric);
+      const tgtShown = yt === null ? "" : formatTargetInput(metric, yt);
+      return `<td class="yearly-target-col"><div class="target-only-cell yearly-target-cell">`
+        + `<span class="yearly-target-lbl">Yearly Target</span>`
+        + valueInputHtml(mIdx, yKey, "target", tgtShown)
+        + `</div></td>`;
     }
 
     function ratioMetricSpec(metric) {
@@ -2074,9 +2096,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const gapTd = row.querySelector("td.gap-col");
       if (!gapTd) return;
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
-      const ytBlock = isYearlyTargetMetric(metric)
-        ? gapYearlyTargetBlockHtml(metric, getYearlyTargetDisplay(metric))
-        : "";
+      const ytBlock = gapYearlyTargetBlockHtml(metric, getYearlyTargetDisplay(metric));
       const totals = computeSelectionGap(metric, months);
       if (!totals || totals.gap === null || totals.gap === undefined) {
         gapTd.innerHTML = `<div class="cell-gap empty">—</div>${ytBlock}`;
@@ -2302,13 +2322,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           if (getRatioYearlyTargetPct(metric) !== null) n++;
           return;
         }
-        if (isYearlyTargetMetric(metric)) {
+        if (isYearlySingleCellMetric(metric)) {
           if (getYearlyTarget(metric) !== null) n++;
           return;
         }
         CFG.monthKeys.forEach(monthKey => {
           if (getTarget(metric, monthKey) !== null) n++;
         });
+        if (getYearlyTarget(metric) !== null) n++;
       });
       return n;
     }
@@ -2448,7 +2469,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function setTargetIdx(idx, monthKey, raw, finalize) {
       if (!isTargetEditUnlocked()) return;
       const metric = metricByIdx(editMetricsList, idx);
-      const storageMonth = isYearlyTargetMetric(metric) ? (CFG.yearlyTargetKey || "yearly") : monthKey;
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const storageMonth = monthKey === yKey ? yKey : monthKey;
       const k = cellKey(metric, storageMonth);
       const trimmed = String(raw).trim();
       if (trimmed === "") {
@@ -2804,14 +2826,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function gapPerformanceCellHtml(metric, monthKeys) {
-      const yt = getYearlyTargetDisplay(metric);
-      const ytBlock = isYearlyTargetMetric(metric) ? gapYearlyTargetBlockHtml(metric, yt) : "";
+      const ytBlock = gapYearlyTargetBlockHtml(metric, getYearlyTargetDisplay(metric));
       const totals = computeSelectionGap(metric, monthKeys);
       if (!totals || totals.gap === null || totals.gap === undefined) {
-        if (ytBlock) {
-          return `<td class="gap-col"><div class="cell-gap empty">—</div>${ytBlock}</td>`;
-        }
-        return `<td class="gap-col"><div class="cell-gap empty">—</div></td>`;
+        return `<td class="gap-col"><div class="cell-gap empty">—</div>${ytBlock}</td>`;
       }
       const met = meetsTarget(totals.actual, totals.target, metric);
       const cls = met ? "hit" : "miss";
@@ -3371,34 +3389,31 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         + months.map(k => {
           const lbl = CFG.monthLabels[monthIndex(k)];
           return `<th class="month-col">${lbl}<span class="edit-sub">Target</span></th>`;
-        }).join("") + "</tr>";
+        }).join("")
+        + `<th class="yearly-target-head month-col">2026<span class="edit-sub">Yearly Target</span></th></tr>`;
 
       tbody.innerHTML = filteredEditMetrics().map((metric) => {
         const mIdx = editMetricsList.indexOf(metric);
         const rowCls = isManualMetric(metric) ? "manual-row" : "";
-        const cells = isYearlyTargetMetric(metric)
-          ? (() => {
-              const yt = getYearlyTarget(metric);
-              const ytDisplay = metric === "DC" ? getRatioYearlyTargetPct(metric) : yt;
-              const tgtShown = ytDisplay === null ? "" : formatTargetInput(metric, ytDisplay);
-              const yKey = CFG.yearlyTargetKey || "yearly";
-              const lbl = metric === "DC" ? "Yearly Target (%)" : "Yearly Target";
-              const note = metric === "DC"
-                ? `<div class="ratio-target-note">Actual DC UNITS in KPI by Leader · SOLD UNITS from Golden</div>`
-                : `<div class="ratio-target-note">Single annual target · one Actual cell in KPI by Leader</div>`;
-              return `<td colspan="${months.length}" class="yearly-target-col"><div class="target-only-cell yearly-target-cell">`
-                + `<span class="yearly-target-lbl">${lbl}</span>`
-                + valueInputHtml(mIdx, yKey, "target", tgtShown)
-                + note
-                + `</div></td>`;
-            })()
-          : months.map(monthKey => {
-          const tgt = getTarget(metric, monthKey);
-          const tgtShown = tgt === null ? "" : formatTargetInput(metric, tgt);
-          return `<td><div class="target-only-cell">`
-            + valueInputHtml(mIdx, monthKey, "target", tgtShown)
-            + `</div></td>`;
-        }).join("");
+        let cells;
+        if (isYearlySingleCellMetric(metric)) {
+          const note = metric === "DC"
+            ? "Annual KPI · DC Actual = DC UNITS per month in KPI by Leader"
+            : "Annual KPI · one Actual cell in KPI by Leader";
+          cells = `<td colspan="${months.length}" class="yearly-target-col"><div class="yearly-row-note">${note}</div></td>`
+            + yearlyTargetEditCellHtml(mIdx, metric);
+        } else if (isRatioMetric(metric)) {
+          cells = `<td colspan="${months.length}" class="yearly-target-col"><div class="yearly-row-note">Ratio KPI · monthly Actual cells</div></td>`
+            + yearlyTargetEditCellHtml(mIdx, metric);
+        } else {
+          cells = months.map(monthKey => {
+            const tgt = getTarget(metric, monthKey);
+            const tgtShown = tgt === null ? "" : formatTargetInput(metric, tgt);
+            return `<td><div class="target-only-cell">`
+              + valueInputHtml(mIdx, monthKey, "target", tgtShown)
+              + `</div></td>`;
+          }).join("") + yearlyTargetEditCellHtml(mIdx, metric);
+        }
         return `<tr class="${rowCls}"><td class="leader-col">${ownerCellHtml(mIdx, "leader")}</td>`
           + `<td class="partner-col">${ownerCellHtml(mIdx, "partner")}</td>`
           + `<td class="metric-cell">${editMetricCellHtml(metric)}</td>${cells}</tr>`;
