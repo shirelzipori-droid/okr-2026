@@ -153,6 +153,10 @@ GAP_MODES: dict[str, str] = {
     "Shrink/DDE FEE": "weighted_average",
     "OFL / order (ILS)": "weighted_average",
     "VP%": "gov_weighted_cumulative",
+    "Weighted Availability": "average_vs_average",
+    "KVI & Promo WA%": "average_vs_average",
+    "POFR%": "average_vs_average",
+    "Under 45min >": "average_vs_average",
 }
 GAP_WEIGHT_METRICS: dict[str, str] = {
     "DDE FEE/order": "Orders",
