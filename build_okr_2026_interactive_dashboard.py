@@ -159,6 +159,7 @@ GAP_MODES: dict[str, str] = {
     "Under 45min >": "average_vs_average",
     "UP-TIME >": "average_vs_average",
     "UPH >": "average_vs_average",
+    "Area Product Selection": "average_vs_average",
 }
 GAP_PCT_ONLY_METRICS: list[str] = [
     "UPH >",
@@ -1644,6 +1645,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metricFormat(metric) === "integer" ? 0 : 1;
     }
 
+    function formatInteger(n) {
+      return Math.round(n).toLocaleString("en-US");
+    }
+
     function formatDisplay(metric, value, forTarget) {
       if (value === null || value === undefined) return "—";
       const n = Number(value);
@@ -1653,7 +1658,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (spec.startsWith("percent")) {
         return n.toFixed(d) + "%";
       }
-      if (spec === "integer") return String(Math.round(n));
+      if (spec === "integer") return formatInteger(n);
       return n.toFixed(d);
     }
 
@@ -1662,7 +1667,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const n = Number(val);
       if (!Number.isFinite(n)) return "";
       const spec = metricFormat(metric);
-      if (spec === "integer") return String(Math.round(n));
+      if (spec === "integer") return formatInteger(n);
       const d = actualDecimals(metric);
       return n.toFixed(d) + (spec.startsWith("percent") ? "%" : "");
     }
@@ -1674,8 +1679,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function parseTargetRaw(raw) {
-      const s = String(raw).trim().replace(",", ".").replace(/^\+/, "");
+      let s = String(raw).trim().replace(/^\+/, "");
       if (s === "" || s === "-" || s === "." || s === "-.") return null;
+      if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, "");
+      else s = s.replace(",", ".");
       const n = Number(s);
       return Number.isFinite(n) ? roundTarget(n) : null;
     }
@@ -1695,7 +1702,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (!Number.isFinite(n)) return "";
       if (metric === "Shrink/DDE FEE") n = Math.abs(n);
       const spec = metricFormat(metric);
-      if (spec === "integer") return String(Math.round(n));
+      if (spec === "integer") return formatInteger(n);
       const s = n.toFixed(actualDecimals(metric));
       return targetUsesPlusSign(metric) ? "+" + s : s;
     }
