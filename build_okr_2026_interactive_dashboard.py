@@ -662,9 +662,20 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       text-align: center;
     }
     th.month-col {
-      font-size: 14px; font-weight: 700; font-family: var(--font-ui);
-      letter-spacing: 0.05em; vertical-align: middle; padding: 12px 6px;
-      min-width: 92px;
+      font-size: 13px; font-weight: 700; font-family: var(--font-ui);
+      letter-spacing: 0.05em; vertical-align: middle; padding: 8px 5px;
+      min-width: 76px;
+    }
+    th.gap-col {
+      font-size: 12px; font-weight: 700; font-family: var(--font-ui);
+      letter-spacing: 0.04em; vertical-align: middle; padding: 8px 5px;
+      min-width: 68px; background: #eef9fc;
+    }
+    th.gap-col .th-sub { color: #007a94; }
+    th.gap-divider, td.gap-divider {
+      width: 5px; min-width: 5px; max-width: 5px; padding: 0;
+      background: var(--wolt-cyan-muted);
+      border-left: 2px solid var(--wolt-cyan-dark);
     }
     th.month-col .th-sub, .edit-sub {
       display: block; font-size: 12px; font-weight: 600; text-transform: none;
@@ -758,14 +769,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .src-link:hover { text-decoration: underline; }
     .src-link svg { width: 12px; height: 12px; opacity: 0.85; }
     .perf-cell-wrap {
-      display: flex; flex-direction: column; align-items: stretch; gap: 6px; min-width: 84px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 72px;
     }
     .cell-actual {
-      border-radius: var(--radius-sm); padding: 8px 6px; min-width: 84px; min-height: 52px;
+      border-radius: var(--radius-sm); padding: 6px 5px; min-width: 72px; min-height: 44px;
       background: var(--neutral-bg); border: 1px solid var(--border);
       box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;
     }
-    .cell-actual.has-target { min-height: 56px; }
+    .cell-actual.has-target { min-height: 44px; }
     .cell-actual.miss {
       background: var(--miss-bg) !important; border: 2px solid var(--miss-border) !important; color: var(--miss-text);
     }
@@ -773,7 +784,25 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       background: var(--hit-bg) !important; border: 2px solid var(--hit-border) !important; color: var(--hit-text);
     }
     .cell-actual.no-target { border-style: dashed; opacity: 0.92; }
-    .actual-val { font-size: 17px; font-weight: 700; line-height: 1.2; font-family: var(--font-ui); letter-spacing: -0.02em; }
+    .actual-val { font-size: 15px; font-weight: 700; line-height: 1.2; font-family: var(--font-ui); letter-spacing: -0.02em; }
+    .cell-gap {
+      border-radius: var(--radius-sm); padding: 5px 4px; min-width: 64px; min-height: 44px;
+      background: #f8fdff; border: 1px solid #c2eef8;
+      box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center;
+    }
+    .cell-gap.miss {
+      background: var(--miss-bg) !important; border: 2px solid var(--miss-border) !important; color: var(--miss-text);
+    }
+    .cell-gap.hit {
+      background: var(--hit-bg) !important; border: 2px solid var(--hit-border) !important; color: var(--hit-text);
+    }
+    .cell-gap.empty { color: #94a3b8; font-style: italic; font-size: 12px; border-style: dashed; }
+    .gap-val { font-size: 14px; font-weight: 700; line-height: 1.15; font-family: var(--font-ui); letter-spacing: -0.02em; }
+    .gap-ref {
+      font-size: 9px; font-weight: 600; color: var(--muted); margin-top: 2px; line-height: 1.2;
+      text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .cell-gap.hit .gap-ref, .cell-gap.miss .gap-ref { opacity: 0.85; }
     .cell-target-mini {
       padding: 6px 10px; border-radius: var(--radius-sm); text-align: center;
       background: var(--wolt-cyan-pale); border: 1.5px solid var(--wolt-cyan-light);
@@ -921,8 +950,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="panel-head">
         <h2>Main KPIs — Actual vs Target</h2>
         <div class="legend">
-          <span><i class="swatch-hit"></i> On target</span>
-          <span><i class="swatch-miss"></i> Below target (or above for cost metrics)</span>
+          <span><i class="swatch-hit"></i> Gap on target</span>
+          <span><i class="swatch-miss"></i> Gap off target</span>
+          <span style="color:var(--muted);">Gap column · monthly view only</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -943,8 +973,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       <div class="panel-head">
         <h2>KPI by Leader</h2>
         <div class="legend">
-          <span><i class="swatch-hit"></i> On target</span>
-          <span><i class="swatch-miss"></i> Missed</span>
+          <span><i class="swatch-hit"></i> Gap on target</span>
+          <span><i class="swatch-miss"></i> Gap off target</span>
+          <span style="color:var(--muted);">Gap column · monthly view only</span>
         </div>
       </div>
       <div class="table-scroll">
@@ -1802,11 +1833,57 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return null;
     }
 
-    function gapDeltaHtml(metric, monthKey, monthKeys) {
+    function gapReferenceLabel(metric, monthKey, monthKeys) {
+      const mode = gapMode(metric);
+      if (mode === "vs_average") {
+        const avg = averageTargetForMetric(metric, monthKeys);
+        if (avg === null) return "";
+        return `Avg ${formatTargetValue(metric, avg)}`;
+      }
+      if (mode === "cumulative_absolute") {
+        const cum = cumulativeTotalsThrough(metric, monthKey, monthKeys);
+        if (!cum) return "";
+        return `ΣT ${formatTargetValue(metric, cum.target)}`;
+      }
+      const target = getTarget(metric, monthKey);
+      if (target === null) return "";
+      return `T ${formatTargetValue(metric, target)}`;
+    }
+
+    function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
+      if (actual === null && !manual && target === null) {
+        return `<td><div class="cell-actual no-actual">—</div></td>`;
+      }
+      let actualHtml = "";
+      if (manual && mIdx !== undefined) {
+        actualHtml = actualInlineInputHtml(metric, mIdx, monthKey, actualShown);
+      } else {
+        actualHtml = `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
+      }
+      let targetHtml = "";
+      if (target !== null) {
+        targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
+      }
+      return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">${actualHtml}</div>${targetHtml}</div></td>`;
+    }
+
+    function gapPerformanceCellHtml(metric, monthKey, monthKeys) {
       const gap = computeGap(metric, monthKey, monthKeys);
-      if (gap === null) return "";
-      const suffix = gapMode(metric) === "cumulative_absolute" ? "YTD" : "vs target";
-      return `<div class="delta">${formatGapValue(metric, gap)} ${suffix}</div>`;
+      if (gap === null) {
+        return `<td class="gap-col"><div class="cell-gap empty">—</div></td>`;
+      }
+      const totals = gapComparisonTotals(metric, monthKey, monthKeys);
+      const met = totals ? meetsTarget(totals.actual, totals.target, metric) : null;
+      const cls = met ? "hit" : "miss";
+      const ref = gapReferenceLabel(metric, monthKey, monthKeys);
+      const modeLbl = gapMode(metric) === "cumulative_absolute"
+        ? `<div class="gap-ref">YTD</div>`
+        : "";
+      return `<td class="gap-col"><div class="cell-gap ${cls}">`
+        + `<div class="gap-val">${formatGapValue(metric, gap)}</div>`
+        + modeLbl
+        + (ref ? `<div class="gap-ref">${escHtml(ref)}</div>` : "")
+        + `</div></td>`;
     }
 
     function formatTargetValue(metric, value) {
@@ -2036,6 +2113,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
       const anyWeekly = metrics.some(m => isWeeklyMode(m));
       const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
+      const showGap = !anyWeekly;
       const metricIdxMap = {};
       editMetricsList.forEach((m, i) => { metricIdxMap[m] = i; });
       return metrics.map(metric => {
@@ -2062,16 +2140,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               if (actual === null && !manual && target === null) {
                 return `<td><div class="cell-actual no-actual">—</div></td>`;
               }
-              const met = actual !== null ? meetsTarget(actual, target, metric) : null;
-              let cls = "cell-actual";
-              if (target === null) cls += " no-target";
-              else if (actual !== null) { cls += met ? " hit" : " miss"; cls += " has-target"; }
-              else cls += " no-target has-target";
               let targetHtml = "";
               if (target !== null) {
                 targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
               }
-              return `<td><div class="perf-cell-wrap"><div class="${cls}">`
+              return `<td><div class="perf-cell-wrap"><div class="cell-actual no-target">`
                 + `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
                 + `</div>${targetHtml}</div></td>`;
             }).join("")
@@ -2084,33 +2157,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           const actualShown = override !== undefined
             ? formatTargetDisplay(metric, override)
             : (snow !== null ? formatTargetDisplay(metric, snow) : "");
-
-          if (actual === null && !manual && target === null) {
-            return `<td><div class="cell-actual no-actual">—</div></td>`;
-          }
-
-          const met = performanceCellMet(metric, monthKey, months, actual, target);
-          let cls = "cell-actual";
-          if (target === null && gapMode(metric) !== "vs_average") cls += " no-target";
-          else if (actual !== null && met !== null) { cls += met ? " hit" : " miss"; cls += " has-target"; }
-          else if (target !== null || gapMode(metric) === "vs_average") cls += " no-target has-target";
-
-          let actualHtml = "";
-          if (manual && mIdx !== undefined) {
-            actualHtml = actualInlineInputHtml(metric, mIdx, monthKey, actualShown);
-          } else {
-            actualHtml = `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
-          }
-
-          let targetHtml = "";
-          if (target !== null) {
-            targetHtml = `<div class="cell-target-mini"><span class="lbl">Target</span>${formatTargetValue(metric, target)}</div>`;
-          }
-
-          const delta = gapDeltaHtml(metric, monthKey, months);
-
-          return `<td><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}${delta}</div>${targetHtml}</div></td>`;
-        }).join("");
+          return actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown);
+        }).join("")
+          + (showGap
+            ? `<td class="gap-divider" aria-hidden="true"></td>`
+              + months.map(monthKey => gapPerformanceCellHtml(metric, monthKey, months)).join("")
+            : "");
         let rowCls = manual ? "manual-row" : "";
         if (wf === "cancelled") rowCls = (rowCls ? rowCls + " " : "") + "row-cancelled";
         if (weeklyRow) rowCls = (rowCls ? rowCls + " " : "") + "row-weekly-mode";
@@ -2123,20 +2175,34 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metrics.some(m => isWeeklyMode(m));
     }
 
+    function gapModeForTableLabel(metrics) {
+      if ((metrics || []).some(m => gapMode(m) === "cumulative_absolute")) return "Gap · YTD";
+      return "Gap";
+    }
+
     function renderPerformanceTableHead(tableId, metrics) {
       const months = CFG.monthKeys.filter(k => selectedMonths.has(k));
       const thead = document.querySelector(`#${tableId} thead`);
       if (!thead) return;
       const anyWeekly = tableUsesWeeklyHeaders(metrics || []);
       const weekPeriods = anyWeekly ? weekPeriodsForView() : [];
-      thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
-        + (anyWeekly
-          ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week</span></th>`).join("")
-          : months.map(k => {
+      const showGap = !anyWeekly;
+      const gapSub = gapModeForTableLabel(metrics);
+      const actualHeaders = anyWeekly
+        ? weekPeriods.map(wk => `<th class="month-col">${escHtml(weekLabelForKey(wk))}<span class="th-sub">Week</span></th>`).join("")
+        : months.map(k => {
+            const i = monthIndex(k);
+            return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Actual</span></th>`;
+          }).join("");
+      const gapHeaders = showGap
+        ? `<th class="gap-divider" aria-hidden="true"></th>`
+          + months.map(k => {
               const i = monthIndex(k);
-              return `<th class="month-col">${CFG.monthLabels[i]}<span class="th-sub">Actual</span></th>`;
+              return `<th class="gap-col">${CFG.monthLabels[i]}<span class="th-sub">${gapSub}</span></th>`;
             }).join("")
-        ) + "</tr>";
+        : "";
+      thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
+        + actualHeaders + gapHeaders + "</tr>";
     }
 
     function renderMainLeaderChips() {
