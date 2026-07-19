@@ -157,7 +157,7 @@ def _gap_gov_vp(cfg: dict, month_keys: list[str]) -> dict:
         "gap_pct": None if vp_t == 0 else 100 * gap / vp_t,
         "vp_pct_actual": vp_pct_a,
         "vp_pct_target": vp_pct_t,
-        "ref": f"ΣVP {vp_a:,.0f}K vs {vp_t:,.0f}K · GOV {vp_pct_a:.2f}% vs {vp_pct_t:.2f}%",
+        "ref": f"ΣVP {vp_a:,.0f}K vs {vp_t:,.0f}K",
     }
 
 

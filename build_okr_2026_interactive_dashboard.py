@@ -143,7 +143,7 @@ METRIC_DIRECTION: dict[str, str] = {
 # "cumulative_absolute" = sum(actual) − sum(target) across selected months (Orders)
 # "average_vs_average" = simple avg(actual) − avg(target); abs + % (PPM%)
 # "weighted_average" = Orders-weighted avg(actual) − weighted avg(target); abs + %
-# "gov_weighted_cumulative" = Σ(VP actual K) − Σ(VP target K); % vs target; GOV-wtd VP%
+# "gov_weighted_cumulative" = Σ(VP actual K) − Σ(VP target K) — display in K ILS only
 # "absolute" = sum(actual − target) for selected period (default until configured)
 GAP_MODE_DEFAULT = "absolute"
 GAP_MODES: dict[str, str] = {
@@ -1979,10 +1979,22 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return direction(metric) === "lower" ? -gap : gap;
     }
 
+    function formatValueK(value) {
+      if (value === null || value === undefined || !Number.isFinite(value)) return "—";
+      return Math.round(value).toLocaleString("en-US") + "K";
+    }
+
     function formatGapValue(metric, gap, mode) {
       if (gap === null) return "—";
+      const m = mode || gapMode(metric);
       const signed = performanceSignedGap(metric, gap);
-      const fmtMetric = gapFormatMetric(metric, mode || gapMode(metric));
+      if (m === "gov_weighted_cumulative") {
+        let txt = Math.round(Math.abs(signed)).toLocaleString("en-US") + "K";
+        if (signed > 0) txt = "+" + txt;
+        else if (signed < 0) txt = "−" + txt;
+        return txt;
+      }
+      const fmtMetric = gapFormatMetric(metric, m);
       let txt = formatDisplay(fmtMetric, Math.abs(signed), false);
       if (signed > 0) txt = "+" + txt;
       else if (signed < 0) txt = "−" + txt;
@@ -2017,21 +2029,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return `ΣT ${formatTargetValue(metric, totals.target)}`;
       }
       if (mode === "gov_weighted_cumulative") {
-        const absM = totals.absMetric || gapAbsTargetMetric(metric) || metric;
-        const actPct = totals.vpPctActual !== null && totals.vpPctActual !== undefined
-          ? formatTargetValue(metric, totals.vpPctActual) : "—";
-        const tgtPct = totals.vpPctTarget !== null && totals.vpPctTarget !== undefined
-          ? formatTargetValue(metric, totals.vpPctTarget) : "—";
-        return `ΣVP ${formatTargetValue(absM, totals.actual)} vs ${formatTargetValue(absM, totals.target)} · GOV ${actPct} vs ${tgtPct}`;
+        return `ΣVP ${formatValueK(totals.actual)} vs ${formatValueK(totals.target)}`;
       }
       return `ΣT ${formatTargetValue(metric, totals.target)}`;
     }
 
     function gapShowsPct(mode, metric) {
-      /* % metrics (PPM, Shrink, …): one pp gap line only. DDE/VP: abs + relative %. */
-      if (mode === "average_vs_average") return false;
+      /* VP: K ILS only. % metrics: one pp line. DDE/OFL: abs + relative %. */
+      if (mode === "average_vs_average" || mode === "gov_weighted_cumulative") return false;
       if (isPercentMetric(metric) && mode === "weighted_average") return false;
-      return mode === "weighted_average" || mode === "gov_weighted_cumulative";
+      return mode === "weighted_average";
     }
 
     function gapValueHtml(metric, totals) {
