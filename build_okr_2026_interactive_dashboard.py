@@ -148,6 +148,7 @@ GAP_MODES: dict[str, str] = {
     "Orders": "cumulative_absolute",
     "DDE FEE/order": "average_vs_average",
     "PPM%": "average_vs_average",
+    "Shrink/DDE FEE": "average_vs_average",
 }
 
 METRIC_HINTS: dict[str, str] = {
