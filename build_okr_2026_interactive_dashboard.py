@@ -818,11 +818,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       font-size: 12px; font-weight: 700; font-family: var(--font-ui);
       letter-spacing: 0.03em; vertical-align: middle; padding: 10px 12px;
       min-width: 172px; width: 172px; line-height: 1.3; white-space: normal;
+      text-transform: none;
       background: linear-gradient(180deg, #007a94 0%, #005f73 100%);
       color: #fff;
       border-bottom: 2px solid #004d5c;
     }
-    th.gap-col .th-sub { color: rgba(255, 255, 255, 0.92); margin-top: 4px; }
+    th.gap-col .gap-col-title {
+      display: block; font-size: 13px; font-weight: 700; letter-spacing: 0.02em; line-height: 1.25;
+    }
+    th.gap-col .gap-col-period {
+      display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+      margin-top: 6px; line-height: 1.4; color: rgba(255, 255, 255, 0.92);
+      white-space: normal;
+    }
     th.gap-divider, td.gap-divider {
       width: 5px; min-width: 5px; max-width: 5px; padding: 0;
       background: var(--wolt-cyan-muted);
@@ -3204,7 +3212,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function gapHeaderPeriodLabel(monthKeys) {
-      return selectedPeriodLabel(monthKeys);
+      if (!monthKeys.length) return "";
+      const ordered = monthKeys.slice().sort();
+      return ordered.map(k => CFG.monthLabels[monthIndex(k)]).join("  ");
     }
 
     function renderPerformanceTableHead(tableId, metrics) {
@@ -3223,7 +3233,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           }).join("");
       const gapHeaders = showGap
         ? `<th class="gap-divider" aria-hidden="true"></th>`
-          + `<th class="gap-col">Cumulative Gap<span class="th-sub">${escHtml(gapPeriod)}</span></th>`
+          + `<th class="gap-col"><span class="gap-col-title">Cumulative Gap</span>`
+          + `<span class="gap-col-period">${escHtml(gapPeriod)}</span></th>`
         : "";
       thead.innerHTML = "<tr><th class='leader-col'>Leader</th><th class='partner-col'>Partner</th><th class='corner'>Metric</th>"
         + actualHeaders + gapHeaders + "</tr>";
