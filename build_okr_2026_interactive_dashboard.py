@@ -106,7 +106,7 @@ MONTH_LABELS = [
 DEFAULT_SELECTED_MONTH_KEYS: tuple[str, ...] = (
     "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
 )
-STORAGE_TARGETS = "okr2026_targets_v1"
+STORAGE_TARGETS = "okr2026_targets_v2"  # bump when embedded defaults change materially
 STORAGE_ACTUALS = "okr2026_actuals_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
