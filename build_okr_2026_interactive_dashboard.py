@@ -158,7 +158,11 @@ GAP_MODES: dict[str, str] = {
     "POFR%": "average_vs_average",
     "Under 45min >": "average_vs_average",
     "UP-TIME >": "average_vs_average",
+    "UPH >": "average_vs_average",
 }
+GAP_PCT_ONLY_METRICS: list[str] = [
+    "UPH >",
+]
 GAP_WEIGHT_METRICS: dict[str, str] = {
     "DDE FEE/order": "Orders",
     "Shrink/DDE FEE": "Orders",
@@ -404,6 +408,7 @@ def _build_payload(
         "direction": {m: METRIC_DIRECTION.get(m, "higher") for m in ALL_METRIC_NAMES},
         "gapModeDefault": GAP_MODE_DEFAULT,
         "gapModes": GAP_MODES,
+        "gapPctOnly": GAP_PCT_ONLY_METRICS,
         "gapWeightMetrics": GAP_WEIGHT_METRICS,
         "gapAbsTargetMetrics": gap_abs_target_metrics,
         "vpAbsoluteK": vp_absolute_k,
@@ -2033,8 +2038,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return `ΣT ${formatTargetValue(metric, totals.target)}`;
     }
 
+    function gapPctOnly(metric) {
+      return (CFG.gapPctOnly || []).includes(metric);
+    }
+
     function gapShowsPct(mode, metric) {
-      /* VP: K ILS only. % metrics: one pp line. DDE/OFL: abs + relative %. */
+      /* VP: K ILS only. % metrics: one pp line. DDE/OFL: abs + relative %. UPH: % only. */
+      if (gapPctOnly(metric)) return false;
       if (mode === "average_vs_average" || mode === "gov_weighted_cumulative") return false;
       if (isPercentMetric(metric) && mode === "weighted_average") return false;
       return mode === "weighted_average";
@@ -2042,6 +2052,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function gapValueHtml(metric, totals) {
       const mode = gapMode(metric);
+      if (gapPctOnly(metric)) {
+        const pctTxt = formatGapPct(performanceSignedGap(metric, totals.pctGap));
+        return `<div class="gap-val">${pctTxt ? escHtml(pctTxt) : "—"}</div>`;
+      }
       if (gapShowsPct(mode, metric)) {
         const pctTxt = formatGapPct(performanceSignedGap(metric, totals.pctGap));
         return `<div class="gap-val">${formatGapValue(metric, totals.gap, mode)}</div>`
