@@ -143,6 +143,7 @@ METRIC_DIRECTION: dict[str, str] = {
 # "cumulative_absolute" = sum(actual) − sum(target) across selected months (Orders)
 # "average_vs_average" = simple avg(actual) − avg(target); abs + % (PPM%)
 # "weighted_average" = Orders-weighted avg(actual) − weighted avg(target); abs + %
+# "gov_weighted_cumulative" = Σ(VP actual K) − Σ(VP target K); % vs target; GOV-wtd VP%
 # "absolute" = sum(actual − target) for selected period (default until configured)
 GAP_MODE_DEFAULT = "absolute"
 GAP_MODES: dict[str, str] = {
@@ -151,11 +152,16 @@ GAP_MODES: dict[str, str] = {
     "PPM%": "average_vs_average",
     "Shrink/DDE FEE": "weighted_average",
     "OFL / order (ILS)": "weighted_average",
+    "VP%": "gov_weighted_cumulative",
 }
 GAP_WEIGHT_METRICS: dict[str, str] = {
     "DDE FEE/order": "Orders",
     "Shrink/DDE FEE": "Orders",
     "OFL / order (ILS)": "Orders",
+}
+# Absolute target series for gap (shown in Target tab under the % metric).
+GAP_ABS_TARGET_METRICS: dict[str, str] = {
+    "VP%": "VP (K ILS)",
 }
 
 METRIC_HINTS: dict[str, str] = {
@@ -163,6 +169,7 @@ METRIC_HINTS: dict[str, str] = {
     "FTU": "Thousands (K)",
     "Returning Clients": "Thousands (K)",
     "VSL": "ISR country incl. DC",
+    "VP (K ILS)": "Variable Profit · K ILS (Monthly Plan)",
 }
 
 # Display format: percent | integer | decimal:N (N = decimal places for actuals)
@@ -177,6 +184,7 @@ METRIC_FORMAT: dict[str, str] = {
     "Shrink/DDE FEE": "percent:2",
     "OFL / order (ILS)": "decimal:1",
     "VP%": "percent:1",
+    "VP (K ILS)": "integer",
     "Weighted Availability": "percent:1",
     "KVI & Promo WA%": "percent:1",
     "Sold from selection — sold_from_selection_perc": "percent:2",
@@ -219,6 +227,27 @@ METRIC_FORMAT: dict[str, str] = {
     "EngagMe growth": "percent:1",
 }
 
+
+
+def _load_cached_vp_aux() -> tuple[list[float | None], list[float | None]]:
+    """IBM VP and GOV totals (K ILS) from validation cache — for VP% GOV-weighted gap."""
+    if not VALIDATION_HTML.is_file():
+        return [None] * DASHBOARD_MONTH_COUNT, [None] * DASHBOARD_MONTH_COUNT
+    text = VALIDATION_HTML.read_text(encoding="utf-8")
+    match = re.search(r"window\.OKR_VALIDATION = (\{.*?\});</script>", text, re.S)
+    if not match:
+        return [None] * DASHBOARD_MONTH_COUNT, [None] * DASHBOARD_MONTH_COUNT
+    payload = json.loads(match.group(1))
+    vp_check = payload.get("vp_cross_check") or {}
+    vp_k = [
+        (float(v) / 1000.0) if v is not None else None
+        for v in vp_check.get("ibm_vp_total_ils") or []
+    ]
+    gov_k = [
+        (float(v) / 1000.0) if v is not None else None
+        for v in vp_check.get("ibm_gov_total_ils") or []
+    ]
+    return _pad_series(vp_k), _pad_series(gov_k)
 
 
 def _load_cached_weekly() -> dict | None:
@@ -321,6 +350,13 @@ def _build_payload(
     }
     default_targets = build_default_targets_flat(MONTH_KEYS)
     default_selected_months = _default_selected_month_keys(actuals_snow)
+    vp_absolute_k, gov_k = _load_cached_vp_aux()
+    gap_abs_target_metrics = dict(GAP_ABS_TARGET_METRICS)
+    for parent, child in gap_abs_target_metrics.items():
+        if child not in default_owners and parent in default_owners:
+            default_owners[child] = dict(default_owners[parent])
+        if child not in format_map:
+            format_map[child] = _default_format(child)
     return {
         "mainMetrics": main_metrics,
         "leaderMetrics": leader_metrics,
@@ -364,6 +400,9 @@ def _build_payload(
         "gapModeDefault": GAP_MODE_DEFAULT,
         "gapModes": GAP_MODES,
         "gapWeightMetrics": GAP_WEIGHT_METRICS,
+        "gapAbsTargetMetrics": gap_abs_target_metrics,
+        "vpAbsoluteK": vp_absolute_k,
+        "govK": gov_k,
         "format": format_map,
         "storage": {
             "targets": STORAGE_TARGETS,
@@ -1334,6 +1373,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       [...main, ...leader, ...toDelete].forEach(m => {
         if (!seen.has(m)) { seen.add(m); out.push(m); }
       });
+      const gapAbs = CFG.gapAbsTargetMetrics || {};
+      Object.entries(gapAbs).forEach(([parent, absMetric]) => {
+        const pi = out.indexOf(parent);
+        if (pi >= 0 && !seen.has(absMetric)) {
+          out.splice(pi + 1, 0, absMetric);
+          seen.add(absMetric);
+        }
+      });
       return out;
     }
 
@@ -1777,6 +1824,56 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return (CFG.gapWeightMetrics && CFG.gapWeightMetrics[metric]) || "Orders";
     }
 
+    function gapAbsTargetMetric(metric) {
+      return (CFG.gapAbsTargetMetrics && CFG.gapAbsTargetMetrics[metric]) || null;
+    }
+
+    function getVpAbsoluteK(idx) {
+      const arr = CFG.vpAbsoluteK || [];
+      return idx >= 0 && idx < arr.length ? arr[idx] : null;
+    }
+
+    function getGovK(idx) {
+      const arr = CFG.govK || [];
+      return idx >= 0 && idx < arr.length ? arr[idx] : null;
+    }
+
+    function govWeightedCumulativeTotals(metric, monthKeys) {
+      const absMetric = gapAbsTargetMetric(metric);
+      if (!absMetric) return null;
+      const ordered = monthKeys.slice().sort();
+      let vpActualSum = 0;
+      let vpTargetSum = 0;
+      let govSum = 0;
+      let used = 0;
+      for (const mk of ordered) {
+        const idx = monthIndex(mk);
+        const vpActual = getVpAbsoluteK(idx);
+        const vpTarget = getTarget(absMetric, mk);
+        const gov = getGovK(idx);
+        if (vpActual === null || vpTarget === null || gov === null) continue;
+        vpActualSum += vpActual;
+        vpTargetSum += vpTarget;
+        govSum += gov;
+        used += 1;
+      }
+      if (!used || !govSum) return null;
+      const gap = vpActualSum - vpTargetSum;
+      const pctGap = vpTargetSum !== 0 ? (gap / vpTargetSum) * 100 : null;
+      const vpPctActual = 100 * vpActualSum / govSum;
+      const vpPctTarget = 100 * vpTargetSum / govSum;
+      return {
+        actual: vpActualSum,
+        target: vpTargetSum,
+        gap,
+        pctGap,
+        vpPctActual,
+        vpPctTarget,
+        months: used,
+        absMetric,
+      };
+    }
+
     function averageCompareTotals(metric, monthKeys) {
       const ordered = monthKeys.slice().sort();
       let actualSum = 0;
@@ -1858,14 +1955,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function computeSelectionGap(metric, monthKeys) {
       const mode = gapMode(metric);
+      if (mode === "gov_weighted_cumulative") return govWeightedCumulativeTotals(metric, monthKeys);
       if (mode === "weighted_average") return weightedCompareTotals(metric, monthKeys);
       if (mode === "average_vs_average") return averageCompareTotals(metric, monthKeys);
       return selectionTotals(metric, monthKeys);
     }
 
-    function formatGapValue(metric, gap) {
+    function gapFormatMetric(metric, mode) {
+      if (mode === "gov_weighted_cumulative") {
+        const absMetric = gapAbsTargetMetric(metric);
+        if (absMetric) return absMetric;
+      }
+      return metric;
+    }
+
+    function formatGapValue(metric, gap, mode) {
       if (gap === null) return "—";
-      let txt = formatDisplay(metric, gap, false);
+      const fmtMetric = gapFormatMetric(metric, mode || gapMode(metric));
+      let txt = formatDisplay(fmtMetric, gap, false);
       if (gap > 0) txt = "+" + txt;
       return txt;
     }
@@ -1897,21 +2004,29 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (mode === "cumulative_absolute") {
         return `ΣT ${formatTargetValue(metric, totals.target)}`;
       }
+      if (mode === "gov_weighted_cumulative") {
+        const absM = totals.absMetric || gapAbsTargetMetric(metric) || metric;
+        const actPct = totals.vpPctActual !== null && totals.vpPctActual !== undefined
+          ? formatTargetValue(metric, totals.vpPctActual) : "—";
+        const tgtPct = totals.vpPctTarget !== null && totals.vpPctTarget !== undefined
+          ? formatTargetValue(metric, totals.vpPctTarget) : "—";
+        return `ΣVP ${formatTargetValue(absM, totals.actual)} vs ${formatTargetValue(absM, totals.target)} · GOV ${actPct} vs ${tgtPct}`;
+      }
       return `ΣT ${formatTargetValue(metric, totals.target)}`;
     }
 
     function gapShowsPct(mode) {
-      return mode === "average_vs_average" || mode === "weighted_average";
+      return mode === "average_vs_average" || mode === "weighted_average" || mode === "gov_weighted_cumulative";
     }
 
     function gapValueHtml(metric, totals) {
       const mode = gapMode(metric);
       if (gapShowsPct(mode)) {
         const pctTxt = formatGapPct(totals.pctGap);
-        return `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`
+        return `<div class="gap-val">${formatGapValue(metric, totals.gap, mode)}</div>`
           + (pctTxt ? `<div class="gap-val gap-pct">${escHtml(pctTxt)}</div>` : "");
       }
-      return `<div class="gap-val">${formatGapValue(metric, totals.gap)}</div>`;
+      return `<div class="gap-val">${formatGapValue(metric, totals.gap, mode)}</div>`;
     }
 
     function actualPerformanceCellHtml(metric, actual, target, manual, mIdx, monthKey, actualShown) {
@@ -2253,6 +2368,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (modes.has("weighted_average")) parts.push("wavg");
       if (modes.has("average_vs_average")) parts.push("avg");
       if (modes.has("cumulative_absolute")) parts.push("cumulative");
+      if (modes.has("gov_weighted_cumulative")) parts.push("GOV");
       if (!parts.length) parts.push("cumulative");
       return `${periodLbl} · ${parts.join(" / ")}`;
     }
