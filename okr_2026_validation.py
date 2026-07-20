@@ -46,7 +46,7 @@ LOOKER: dict[str, list[float | None]] = {
     "Avg Units per Order": [11.7, 11.6, 12.2, None, None, None],
     "Order Frequency": [2.98, 2.85, 3.32, None, None, None],
     "Penetration Rate": [14.5, 14.3, 12.8, 15.1, 15.6, 14.8],
-    "Area Product Selection": [4466, 4535, 4292, 3743, 4316, 4591],
+    "Available Product Selection": [4466, 4535, 4292, 3743, 4316, 4591],
     "SOLD UNITS": [4097668, 3727947, 3988782, 3847804, 4307323, 4237300],
     "%Fresh Food / DDE": [38.98, 38.47, 40.00, None, None, None],
     "IDQ": [97.6, 97.7, 97.70, None, None, None],
@@ -84,7 +84,7 @@ METRIC_SOURCE: dict[str, str] = {
     "Avg Units per Order": "snowflake_validated",
     "Order Frequency": "snowflake_validated",
     "Penetration Rate": "snowflake_validated",
-    "Area Product Selection": "snowflake_validated",
+    "Available Product Selection": "snowflake_validated",
     "SOLD UNITS": "snowflake_validated",
     "IDQ": "snowflake_validated",
     "VSL": "snowflake_validated",
@@ -242,12 +242,16 @@ PENETRATION_NOTE = (
     "לא PENETRATION_RATE KPI tile (USER_BASE ÷ COVERAGE_AREA_USERS)."
 )
 PRODUCT_SELECTION_NOTE = (
-    "Area Product Selection = Available Selection (Golden 106615 KPI: sum AVAILABLE_PRODUCT_SELECTION_NUMERATOR "
+    "Available Product Selection = Available Selection (Golden 106615 KPI: sum AVAILABLE_PRODUCT_SELECTION_NUMERATOR "
     "÷ active WM stores, ISR). לא Product Selection / AVG_PRODUCT_SELECTION (presentation deprecated)."
 )
 IDQ_NOTE = (
     "IDQ = Item Data Quality (Golden 106615: WM_IDQ_NUMERATOR ÷ WM_IDQ_DENOMINATOR, ISR country month). "
     "לא wolt_market_data/wolt_market_items (~97.6 OKR slide — ! לא מאושר)."
+)
+_LOOKER_AVAILABLE_PRODUCT_SELECTION = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=fctZr0QD5aCozrrhbC0KgE&origin_space=27423&toggle=fil,vis"
 )
 _LOOKER_GOLDEN_SELECTION = (
     "https://looker.wolt.com/dashboards/106615"
@@ -606,7 +610,7 @@ USER_VERIFIED: frozenset[str] = frozenset({
     "Avg Units per Order",
     "Order Frequency",
     "Penetration Rate",
-    "Area Product Selection",
+    "Available Product Selection",
     "IDQ",
     "VSL",
     "UP-TIME >",
@@ -659,7 +663,7 @@ LOOKER_FIELD_ALIASES: dict[str, str] = {
     "Avg Units per Order": "Avg Units per Order",
     "Order Frequency": "Order Frequency",
     "Penetration Rate": "Active Users % of Country MAU",
-    "Area Product Selection": "Available Selection (Golden Selection 106615)",
+    "Available Product Selection": "Available Selection (Golden Selection 106615)",
     "SOLD UNITS": "SOLD_UNITS (Golden Growth 106613 · MART WM ISR)",
     "VSL": "Vendor Service Level % (Golden SCM 106617 · ISR incl. DC)",
     "UP-TIME >": "Weighted Uptime %",
@@ -696,7 +700,10 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "Avg Units per Order": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Order Frequency": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Penetration Rate": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
-    "Area Product Selection": ("Golden Selection — ISR (106615)", _LOOKER_GOLDEN_SELECTION),
+    "Available Product Selection": (
+        "WM Venue Metrics Aggregated — Available Product Selection (ISR)",
+        _LOOKER_AVAILABLE_PRODUCT_SELECTION,
+    ),
     "SOLD UNITS": ("Golden Growth — Sold Units (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "%Fresh Food / DDE": ("—", ""),
     "VSL": ("Golden SCM — ISR (106617)", _LOOKER_GOLDEN_SCM),
@@ -727,7 +734,7 @@ OKR_DASHBOARD_METRIC_ORDER: list[str] = [
     "PPM%", "Shrink/DDE FEE",
     "OFL / order (ILS)", "VP%", "Weighted Availability", "KVI & Promo WA%",
     "POFR%", "Under 45min >", "Avg Units per Order",
-    "Order Frequency", "Penetration Rate", "Area Product Selection",
+    "Order Frequency", "Penetration Rate", "Available Product Selection",
     "%Fresh Food / DDE", "IDQ", "VSL", "UP-TIME >", "% Bad Goods Rating",
 ]
 
@@ -1582,7 +1589,7 @@ def _safe_div(num: float | None, den: float | None) -> float | None:
 def _round_val(name: str, value: float | None) -> float | None:
     if value is None:
         return None
-    if name in ("Orders", "FTU", "Returning Clients", "Area Product Selection",
+    if name in ("Orders", "FTU", "Returning Clients", "Available Product Selection",
                 "Maintenance costs", "SOLD UNITS", "DC UNITS"):
         return round(value)
     if name in ("Order Frequency", "DDE FEE/order", "OFL / order (ILS)", "Avg Units per Order",
@@ -1824,8 +1831,8 @@ def fetch_metrics() -> tuple[
             for row in cur.fetchall():
                 m, available_selection = row
                 i = _month_index(m)
-                data["Area Product Selection"][i] = _round_val(
-                    "Area Product Selection",
+                data["Available Product Selection"][i] = _round_val(
+                    "Available Product Selection",
                     float(available_selection) if available_selection is not None else None,
                 )
 

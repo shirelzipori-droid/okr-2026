@@ -150,7 +150,7 @@ GAP_MODE_DEFAULT = "absolute"
 # Average gap + display relative % only (no absolute pp/units line).
 AVERAGE_PCT_GAP_METRICS: list[str] = [
     "UPH >",
-    "Area Product Selection",
+    "Available Product Selection",
     "%Fresh Food / DDE",
     "IDQ",
     "VSL",
@@ -265,7 +265,7 @@ METRIC_FORMAT: dict[str, str] = {
     "Avg Units per Order": "decimal:1",
     "Order Frequency": "decimal:1",
     "Penetration Rate": "percent:1",
-    "Area Product Selection": "integer",
+    "Available Product Selection": "integer",
     "%Fresh Food / DDE": "percent:1",
     "IDQ": "percent:1",
     "VSL": "percent:1",
@@ -280,7 +280,7 @@ METRIC_FORMAT: dict[str, str] = {
     "3PFL GOV (yearly)": "integer",
     "Turning B stores to A": "integer",
     "Awareness": "percent:1",
-    "New special vendors or categories": "integer",
+    "New special vendors or categories": "text",
     "DC UNITS": "integer",
     "SOLD UNITS": "integer",
     "DC": "percent:1",
@@ -459,7 +459,7 @@ def _build_payload(
         "promotedSoldSelectionName": SOLD_FROM_SELECTION_PROMOTED_NAME,
         "soldSelectionVariants": variant_meta,
         "soldSelectionInsertAfter": "KVI & Promo WA%",
-        "soldSelectionInsertAfterLeader": "Area Product Selection",
+        "soldSelectionInsertAfterLeader": "Available Product Selection",
         "approvedLookerExplores": APPROVED_LOOKER_EXPLORES,
         "notCertifiedLookerExplores": _dashboard_not_certified_explores(),
         "reviewPromotionMain": REVIEW_PROMOTION_MAIN,
@@ -1603,7 +1603,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const soldDisplay = CFG.promotedSoldSelectionName;
       const vm = resolveSoldVariantMetric();
       if (vm && promotedReviewMetrics.includes(vm) && !out.includes(soldDisplay)) {
-        out = insertMetricAfter(out, soldDisplay, CFG.soldSelectionInsertAfterLeader || "Area Product Selection");
+        out = insertMetricAfter(out, soldDisplay, CFG.soldSelectionInsertAfterLeader || "Available Product Selection");
       }
       return out;
     }
@@ -1700,9 +1700,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (spec) clearReviewPromotion(spec.metricName, soldSelectionChoice);
     }
 
+    function migrateRenamedMetricKeys(store) {
+      const pairs = [["Area Product Selection", "Available Product Selection"]];
+      for (const [oldName, newName] of pairs) {
+        for (const key of Object.keys(store)) {
+          if (!key.startsWith(oldName + "|")) continue;
+          const nk = newName + key.slice(oldName.length);
+          if (!Object.prototype.hasOwnProperty.call(store, nk)) store[nk] = store[key];
+          delete store[key];
+        }
+      }
+    }
+
     targets = loadJson(CFG.storage.targets, {}, "__okrTargetsMem");
     actualOverrides = loadJson(CFG.storage.actuals, {}, "__okrActualsMem");
     owners = loadJson(CFG.storage.owners, {}, "__okrOwnersMem");
+    migrateRenamedMetricKeys(targets);
+    migrateRenamedMetricKeys(actualOverrides);
+    migrateRenamedMetricKeys(owners);
     loadDcUnitsStore();
 
     function showPersistToast(label) {
@@ -1858,6 +1873,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function isPercentMetric(metric) { return metricFormat(metric).startsWith("percent"); }
+    function isTextMetric(metric) { return metricFormat(metric) === "text"; }
 
     function actualDecimals(metric) {
       /* All non-integer metrics display with exactly one decimal place. */
@@ -1870,6 +1886,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function formatDisplay(metric, value, forTarget) {
       if (value === null || value === undefined) return "—";
+      if (isTextMetric(metric)) {
+        const s = String(value).trim();
+        return s === "" ? "—" : escHtml(s);
+      }
       const n = Number(value);
       if (!Number.isFinite(n)) return "—";
       const spec = metricFormat(metric);
@@ -1883,6 +1903,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function formatTargetDisplay(metric, val) {
       if (val === undefined || val === null || val === "") return "";
+      if (isTextMetric(metric)) return String(val).trim();
       const n = Number(val);
       if (!Number.isFinite(n)) return "";
       const spec = metricFormat(metric);
@@ -1892,6 +1913,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function targetPlaceholder(metric) {
+      if (isTextMetric(metric)) return "Free text";
       if (isPercentMetric(metric)) return "0.0";
       if (metricFormat(metric) === "integer") return "0";
       return "0.0";
@@ -1970,6 +1992,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function formatTargetInput(metric, val) {
       if (val === undefined || val === null || val === "") return "";
+      if (isTextMetric(metric)) return String(val);
       let n = Number(val);
       if (!Number.isFinite(n)) return "";
       if (metric === "Shrink/DDE FEE") n = Math.abs(n);
@@ -1997,9 +2020,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (Object.prototype.hasOwnProperty.call(targets, k)) {
         const v = targets[k];
         if (v === null || v === "") return null;
-        return Number(v);
+        return isTextMetric(metric) ? String(v) : Number(v);
       }
-      return getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
+      const d = getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
+      if (d === null || d === undefined || d === "") return null;
+      return isTextMetric(metric) ? String(d) : Number(d);
     }
 
     function getRatioYearlyTargetPct(metric) {
@@ -2398,7 +2423,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const yKey = CFG.yearlyTargetKey || "yearly";
       const k = cellKey(metric, yKey);
       if (actualOverrides[k] !== undefined && actualOverrides[k] !== null && actualOverrides[k] !== "")
-        return Number(actualOverrides[k]);
+        return isTextMetric(metric) ? String(actualOverrides[k]) : Number(actualOverrides[k]);
       return null;
     }
 
@@ -2423,6 +2448,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const k = cellKey(metric, monthKey);
       const trimmed = String(raw).trim();
       if (trimmed === "") { delete actualOverrides[k]; }
+      else if (isTextMetric(metric)) { actualOverrides[k] = trimmed; }
       else {
         const n = parseTargetRaw(trimmed);
         if (n === null) { if (!finalize) return; return; }
@@ -2452,6 +2478,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       const idx = Number(inp.dataset.idx);
       const metric = metricByIdx(editMetricsList, idx);
+      if (isTextMetric(metric)) {
+        setActualIdx(idx, inp.dataset.month, inp.value, true);
+        return;
+      }
       const n = parseTargetRaw(inp.value);
       if (n !== null) inp.value = formatTargetDisplay(metric, n);
       setActualIdx(idx, inp.dataset.month, inp.value, true);
@@ -2484,6 +2514,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (trimmed === "") {
         if (getDefaultTarget(metric, storageMonth) !== null) targets[k] = null;
         else delete targets[k];
+      } else if (isTextMetric(metric)) {
+        targets[k] = trimmed;
       } else {
         const n = parseTargetRaw(trimmed);
         if (n === null) { if (!finalize) return; return; }
@@ -2511,6 +2543,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       const idx = Number(inp.dataset.idx);
       const metric = metricByIdx(editMetricsList, idx);
+      if (isTextMetric(metric)) {
+        setTargetIdx(idx, inp.dataset.month, inp.value, true);
+        return;
+      }
       const n = parseTargetRaw(inp.value);
       if (n !== null) inp.value = formatTargetInput(metric, normalizeTargetValue(metric, n));
       setTargetIdx(idx, inp.dataset.month, inp.value, true);
@@ -2520,6 +2556,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function meetsTarget(actual, target, metric) {
       if (actual === null || target === null) return null;
+      if (isTextMetric(metric)) return null;
       const dir = direction(metric);
       const eps = 0.004;
       if (dir === "lower") return actual <= target + eps;
@@ -2664,6 +2701,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function yearlyTargetGapTotals(metric, monthKeys) {
+      if (isTextMetric(metric)) return null;
       const yt = getYearlyTarget(metric);
       if (yt === null) return null;
       const actual = getYearlyActual(metric);
@@ -2891,7 +2929,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const ph = targetPlaceholder(metric);
       const cls = kind === "actual" ? "actual-input" : "target-input";
       const lockAttrs = (kind === "target" && !isTargetEditUnlocked()) ? ' readonly tabindex="-1"' : "";
-      const inp = `<input type="text" inputmode="decimal" class="${cls} value-input" data-kind="${kind}" data-idx="${idx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"${lockAttrs}/>`;
+      const modeAttr = isTextMetric(metric) ? "" : ' inputmode="decimal"';
+      const inp = `<input type="text"${modeAttr} class="${cls} value-input" data-kind="${kind}" data-idx="${idx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"${lockAttrs}/>`;
       if (isPercentMetric(metric)) {
         return `<span class="target-wrap percent">${inp}<span class="target-suffix">%</span></span>`;
       }
@@ -3045,7 +3084,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function actualInlineInputHtml(metric, mIdx, monthKey, shown) {
       const ph = targetPlaceholder(metric);
-      return `<input type="text" inputmode="decimal" class="actual-inline-input value-input" data-kind="actual" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
+      const modeAttr = isTextMetric(metric) ? "" : ' inputmode="decimal"';
+      return `<input type="text"${modeAttr} class="actual-inline-input value-input" data-kind="actual" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
     }
 
     function handleDcUnitsInput(inp) {
