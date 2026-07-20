@@ -374,6 +374,10 @@
       background: #059669; border-color: #059669; color: #fff;
     }
     .btn-target-save:disabled { opacity: 0.45; cursor: not-allowed; }
+    .target-paste-hint {
+      font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4;
+    }
+    .target-paste-hint strong { color: var(--text); font-weight: 600; }
     #panelEdit.target-locked .target-input,
     #panelEdit.target-locked .owner-input {
       pointer-events: none; background: var(--surface2); color: var(--muted); cursor: not-allowed;
@@ -760,6 +764,10 @@
           <button type="button" class="btn-target-save hidden" id="btnSaveTargets" disabled>Save targets</button>
           <button type="button" class="btn-target-lock hidden" id="btnLockTargets">Lock editing</button>
         </div>
+        <p class="target-paste-hint hidden" id="targetPasteHint">
+          <strong>Bulk paste from Excel:</strong> copy a row of months (Tab-separated) → click the first month cell → Ctrl+V.
+          Paste applies through Dec + optional Yearly column. Then click <strong>Save targets</strong>.
+        </p>
       </div>
       <div class="table-scroll">
         <table id="editTable">
@@ -913,6 +921,120 @@
       renderEdit();
     }
 
+    function parsePasteGrid(text) {
+      const lines = String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+      while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+      return lines.map(line => line.split("\t"));
+    }
+
+    function isBulkPasteGrid(grid) {
+      if (!grid || !grid.length) return false;
+      if (grid.length > 1) return true;
+      return (grid[0] || []).length > 1;
+    }
+
+    function targetPasteMonthColumns(startMonthKey) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const startIdx = CFG.monthKeys.indexOf(startMonthKey);
+      if (startIdx >= 0) return CFG.monthKeys.slice(startIdx).concat([yKey]);
+      if (startMonthKey === yKey) return [yKey];
+      return [startMonthKey];
+    }
+
+    function metricAcceptsTargetCell(metric, monthKey) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      if (monthKey === yKey) return true;
+      if (isYearlySingleCellMetric(metric) || isRatioMetric(metric)) return false;
+      return true;
+    }
+
+    function applyTargetPasteValue(metric, mIdx, monthKey, raw) {
+      if (!metricAcceptsTargetCell(metric, monthKey)) return false;
+      const trimmed = String(raw ?? "").trim();
+      if (trimmed === "") {
+        setTargetIdx(mIdx, monthKey, "", false);
+        return true;
+      }
+      if (isTextMetric(metric)) {
+        setTargetIdx(mIdx, monthKey, trimmed, false);
+        return true;
+      }
+      const n = parseTargetRaw(trimmed);
+      if (n === null) return false;
+      setTargetIdx(mIdx, monthKey, String(n), false);
+      return true;
+    }
+
+    function applyTargetPaste(anchorInp, pasteGrid) {
+      if (!isTargetEditUnlocked() || anchorInp.dataset.kind !== "target") return 0;
+      if (anchorInp.dataset.note === "1") return 0;
+
+      if (anchorInp.dataset.ratioComponent) {
+        const component = anchorInp.dataset.ratioComponent;
+        const columns = targetPasteMonthColumns(anchorInp.dataset.month);
+        let applied = 0;
+        for (let r = 0; r < pasteGrid.length; r++) {
+          for (let c = 0; c < pasteGrid[r].length; c++) {
+            const monthKey = columns[c];
+            if (!monthKey) break;
+            const raw = pasteGrid[r][c];
+            const trimmed = String(raw ?? "").trim();
+            if (trimmed === "") {
+              setRatioComponentNumeric(component, monthKey, "target", null, false);
+              applied += 1;
+              continue;
+            }
+            const n = parseTargetRaw(trimmed);
+            if (n === null) continue;
+            setRatioComponentNumeric(component, monthKey, "target", n, false);
+            applied += 1;
+          }
+        }
+        return applied;
+      }
+
+      const metrics = filteredEditMetrics();
+      const startMetric = metricByIdx(editMetricsList, Number(anchorInp.dataset.idx));
+      const startRow = metrics.indexOf(startMetric);
+      if (startRow < 0) return 0;
+
+      const columns = targetPasteMonthColumns(anchorInp.dataset.month);
+      let applied = 0;
+      for (let r = 0; r < pasteGrid.length; r++) {
+        const metricRow = startRow + r;
+        if (metricRow >= metrics.length) break;
+        const metric = metrics[metricRow];
+        const mIdx = editMetricsList.indexOf(metric);
+        for (let c = 0; c < pasteGrid[r].length; c++) {
+          const monthKey = columns[c];
+          if (!monthKey) break;
+          if (applyTargetPasteValue(metric, mIdx, monthKey, pasteGrid[r][c])) applied += 1;
+        }
+      }
+      return applied;
+    }
+
+    function bindTargetTablePaste() {
+      const table = document.getElementById("editTable");
+      if (!table || table.dataset.pasteBound === "1") return;
+      table.dataset.pasteBound = "1";
+      table.addEventListener("paste", (e) => {
+        if (!isTargetEditUnlocked()) return;
+        const inp = e.target.closest(".value-input[data-kind='target']");
+        if (!inp || inp.dataset.note === "1") return;
+        const text = e.clipboardData && e.clipboardData.getData("text/plain");
+        if (!text) return;
+        const grid = parsePasteGrid(text);
+        if (!isBulkPasteGrid(grid)) return;
+        e.preventDefault();
+        const applied = applyTargetPaste(inp, grid);
+        if (applied > 0) {
+          renderEdit();
+          showSaveToast(`Pasted ${applied} cell(s) — click Save targets to persist`);
+        }
+      });
+    }
+
     function applyTargetEditLockState() {
       const panel = document.getElementById("panelEdit");
       const bar = document.getElementById("targetLockBar");
@@ -934,6 +1056,8 @@
       }
       if (btnUnlock) btnUnlock.classList.toggle("hidden", !locked);
       if (btnLock) btnLock.classList.toggle("hidden", locked);
+      const pasteHint = document.getElementById("targetPasteHint");
+      if (pasteHint) pasteHint.classList.toggle("hidden", locked);
       updateTargetSaveButton();
     }
 
@@ -3277,6 +3401,7 @@
 
     applyTargetEditLockState();
     initDcUnitsDelegation();
+    bindTargetTablePaste();
 
     renderPeriodChips();
     renderMainLeaderChips();
