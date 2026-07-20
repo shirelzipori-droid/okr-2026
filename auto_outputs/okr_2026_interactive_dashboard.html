@@ -364,6 +364,16 @@
       background: var(--wolt-cyan-deep); border-color: var(--wolt-cyan-deep); color: #fff;
     }
     .btn-target-lock.primary:hover { background: #007a94; border-color: #007a94; color: #fff; }
+    .btn-target-save {
+      background: #ecfdf5; border: 1px solid #6ee7b7; color: #047857;
+      border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: var(--font-ui);
+    }
+    .btn-target-save:hover:not(:disabled) { background: #d1fae5; border-color: #34d399; }
+    .btn-target-save.dirty {
+      background: #059669; border-color: #059669; color: #fff;
+    }
+    .btn-target-save:disabled { opacity: 0.45; cursor: not-allowed; }
     #panelEdit.target-locked .target-input,
     #panelEdit.target-locked .owner-input {
       pointer-events: none; background: var(--surface2); color: var(--muted); cursor: not-allowed;
@@ -747,6 +757,7 @@
         <div class="target-lock-bar locked" id="targetLockBar">
           <span id="targetLockStatus">🔒 Locked — enter PIN to edit</span>
           <button type="button" class="btn-target-lock primary" id="btnUnlockTargets">Enter PIN</button>
+          <button type="button" class="btn-target-save hidden" id="btnSaveTargets" disabled>Save targets</button>
           <button type="button" class="btn-target-lock hidden" id="btnLockTargets">Lock editing</button>
         </div>
       </div>
@@ -822,6 +833,10 @@
     const DC_UNITS_COMPONENT = "DC UNITS";
     let owners = {};
     let metricNotes = {};
+    let targetDraft = {};
+    let ownersDraft = {};
+    let metricNotesDraft = {};
+    let targetSheetDirty = false;
     let storageOk = true;
     let saveTimer = null;
     let activeTargetInput = null;
@@ -830,6 +845,73 @@
     const weeklyModeMetrics = new Set();
 
     function isTargetEditUnlocked() { return targetEditUnlocked; }
+
+    function cloneStore(obj) {
+      return JSON.parse(JSON.stringify(obj || {}));
+    }
+
+    function resetTargetSheetDraft() {
+      targetDraft = cloneStore(targets);
+      ownersDraft = cloneStore(owners);
+      metricNotesDraft = cloneStore(metricNotes);
+      targetSheetDirty = false;
+      updateTargetSaveButton();
+    }
+
+    function markTargetSheetDirty() {
+      targetSheetDirty = true;
+      updateTargetSaveButton();
+    }
+
+    function updateTargetSaveButton() {
+      const btn = document.getElementById("btnSaveTargets");
+      if (!btn) return;
+      const show = isTargetEditUnlocked();
+      btn.classList.toggle("hidden", !show);
+      btn.disabled = !show || !targetSheetDirty;
+      btn.classList.toggle("dirty", targetSheetDirty);
+      btn.textContent = targetSheetDirty ? "Save targets *" : "Save targets";
+    }
+
+    function flushPendingTargetInputs() {
+      const root = document.getElementById("editTable");
+      if (!root) return;
+      root.querySelectorAll(".value-input[data-kind='target']").forEach(inp => {
+        if (inp.dataset.note === "1") return;
+        if (inp.dataset.ratioComponent) {
+          setRatioComponentValue(inp.dataset.ratioComponent, inp.dataset.month, "target", inp.value, false);
+          return;
+        }
+        if (inp.dataset.idx === undefined) return;
+        setTargetIdx(Number(inp.dataset.idx), inp.dataset.month, inp.value, false);
+      });
+      root.querySelectorAll(".metric-note-input[data-kind='target']").forEach(inp => {
+        const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
+        setMetricNoteDraft(metric, inp.dataset.month, "target", inp.value);
+      });
+      root.querySelectorAll(".owner-input").forEach(inp => {
+        const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
+        if (!ownersDraft[metric]) ownersDraft[metric] = {};
+        ownersDraft[metric][inp.dataset.field] = inp.value;
+      });
+    }
+
+    function saveTargetSheet() {
+      if (!isTargetEditUnlocked()) return;
+      flushPendingTargetInputs();
+      targets = cloneStore(targetDraft);
+      owners = cloneStore(ownersDraft);
+      for (const k of Object.keys(metricNotes)) {
+        if (k.endsWith("|target_note")) delete metricNotes[k];
+      }
+      for (const [k, v] of Object.entries(metricNotesDraft)) {
+        if (k.endsWith("|target_note")) metricNotes[k] = v;
+      }
+      saveAll("Targets saved", true);
+      resetTargetSheetDraft();
+      applyTargetEditLockState();
+      renderEdit();
+    }
 
     function applyTargetEditLockState() {
       const panel = document.getElementById("panelEdit");
@@ -846,10 +928,13 @@
       if (status) {
         status.textContent = locked
           ? "🔒 Locked — enter PIN to edit"
-          : "🔓 Unlocked — targets auto-save";
+          : (targetSheetDirty
+            ? "🔓 Unlocked — unsaved changes — click Save targets"
+            : "🔓 Unlocked — click Save targets to persist");
       }
       if (btnUnlock) btnUnlock.classList.toggle("hidden", !locked);
       if (btnLock) btnLock.classList.toggle("hidden", locked);
+      updateTargetSaveButton();
     }
 
     function openTargetPinModal() {
@@ -894,6 +979,10 @@
     }
 
     function lockTargetEditing() {
+      if (targetSheetDirty) {
+        if (!confirm("יש שינויים שלא נשמרו. לנעול בלי לשמור?")) return;
+        resetTargetSheetDraft();
+      }
       targetEditUnlocked = false;
       sessionStorage.removeItem(targetUnlockKey);
       applyTargetEditLockState();
@@ -1234,11 +1323,27 @@
       return metricNotes[noteStorageKey(metric, monthKey, kind)] || "";
     }
 
+    function getEditMetricNote(metric, monthKey, kind) {
+      return metricNotesDraft[noteStorageKey(metric, monthKey, kind)] || "";
+    }
+
+    function setMetricNoteDraft(metric, monthKey, kind, raw) {
+      const k = noteStorageKey(metric, monthKey, kind);
+      const trimmed = String(raw).trim();
+      if (trimmed === "") delete metricNotesDraft[k];
+      else metricNotesDraft[k] = trimmed;
+      markTargetSheetDirty();
+    }
+
     function setMetricNote(metric, monthKey, kind, raw, finalize) {
       const k = noteStorageKey(metric, monthKey, kind);
       const trimmed = String(raw).trim();
       if (trimmed === "") delete metricNotes[k];
       else metricNotes[k] = trimmed;
+      if (kind === "target") {
+        setMetricNoteDraft(metric, monthKey, kind, raw);
+        return;
+      }
       if (finalize) saveMetricNotes(true);
       else persistDraft();
     }
@@ -1257,6 +1362,7 @@
     migrateRenamedMetricKeys(owners);
     migrateRenamedMetricKeys(metricNotes);
     migrateVendorsTextToNotes();
+    resetTargetSheetDraft();
     loadDcUnitsStore();
 
     function showPersistToast(label) {
@@ -1461,7 +1567,7 @@
     }
 
     function parseTargetRaw(raw) {
-      let s = String(raw).trim().replace(/^\+/, "").replace(/\s/g, "");
+      let s = String(raw).trim().replace(/^\+/, "").replace(/%$/, "").replace(/\s/g, "");
       if (s === "" || s === "-" || s === "." || s === "-.") return null;
       if (/^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, "");
       else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, "");
@@ -1484,17 +1590,12 @@
       if (kind === "target") {
         if (!isTargetEditUnlocked()) return;
         if (n === null) {
-          if (getDefaultTarget(component, storageMonth) !== null) targets[k] = null;
-          else delete targets[k];
+          if (getDefaultTarget(component, storageMonth) !== null) targetDraft[k] = null;
+          else delete targetDraft[k];
         } else {
-          targets[k] = normalizeTargetValue(component, n);
+          targetDraft[k] = normalizeTargetValue(component, n);
         }
-        persistDraft();
-        if (finalize) {
-          showPersistToast("Targets saved");
-          renderEdit();
-          updateDcGapCell("DC");
-        }
+        markTargetSheetDirty();
         return;
       }
       if (component === DC_UNITS_COMPONENT) {
@@ -1568,6 +1669,36 @@
       return isTextMetric(metric) ? String(d) : Number(d);
     }
 
+    function getEditYearlyTarget(metric) {
+      if (isRatioMetric(metric)) return null;
+      const k = yearlyTargetStorageKey(metric);
+      if (Object.prototype.hasOwnProperty.call(targetDraft, k)) {
+        const v = targetDraft[k];
+        if (v === null || v === "") return null;
+        return isTextMetric(metric) ? String(v) : Number(v);
+      }
+      const d = getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
+      if (d === null || d === undefined || d === "") return null;
+      return isTextMetric(metric) ? String(d) : Number(d);
+    }
+
+    function getEditYearlyTargetDisplay(metric) {
+      if (isRatioMetric(metric)) return getEditRatioYearlyTargetPct(metric);
+      return getEditYearlyTarget(metric);
+    }
+
+    function getEditRatioYearlyTargetPct(metric) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const direct = getTargetValue(metric, yKey, true);
+      if (direct !== null) return direct;
+      const spec = ratioMetricSpec(metric);
+      if (!spec) return null;
+      return computeRatioPct(
+        getTargetValue(spec.numerator, yKey, true),
+        getTargetValue(spec.denominator, yKey, true),
+      );
+    }
+
     function getRatioYearlyTargetPct(metric) {
       const yKey = CFG.yearlyTargetKey || "yearly";
       const direct = getTargetValue(metric, yKey);
@@ -1600,10 +1731,10 @@
 
     function yearlyTargetEditCellHtml(mIdx, metric) {
       const yKey = CFG.yearlyTargetKey || "yearly";
-      const yt = getYearlyTargetDisplay(metric);
+      const yt = getEditYearlyTargetDisplay(metric);
       const tgtShown = yt === null ? "" : formatTargetInput(metric, yt);
       const targetField = isMetricWithNotes(metric)
-        ? valueWithNoteInputHtml(metric, mIdx, yKey, "target", tgtShown, getMetricNote(metric, yKey, "target"))
+        ? valueWithNoteInputHtml(metric, mIdx, yKey, "target", tgtShown, getEditMetricNote(metric, yKey, "target"))
         : valueInputHtml(mIdx, yKey, "target", tgtShown);
       return `<td class="yearly-target-col"><div class="target-only-cell yearly-target-cell">`
         + `<span class="yearly-target-lbl">Yearly Target</span>`
@@ -1636,12 +1767,13 @@
       return 100 * n / d;
     }
 
-    function getTargetValue(metric, monthKey) {
+    function getTargetValue(metric, monthKey, useDraft) {
+      const store = useDraft ? targetDraft : targets;
       const k = cellKey(metric, monthKey);
-      if (Object.prototype.hasOwnProperty.call(targets, k)) {
-        const v = targets[k];
+      if (Object.prototype.hasOwnProperty.call(store, k)) {
+        const v = store[k];
         if (v === null || v === "") return null;
-        return Number(v);
+        return isTextMetric(metric) ? String(v) : Number(v);
       }
       return getDefaultTarget(metric, monthKey);
     }
@@ -1776,8 +1908,8 @@
       if (!grid) return;
       const yKey = CFG.yearlyTargetKey || "yearly";
       const spec = ratioMetricSpec(metric);
-      let numT = getTargetValue(spec.numerator, yKey);
-      let denT = getTargetValue(spec.denominator, yKey);
+      let numT = getTargetValue(spec.numerator, yKey, true);
+      let denT = getTargetValue(spec.denominator, yKey, true);
       const typed = parseTargetRaw(String(inp.value).trim());
       if (typed !== null) {
         if (inp.dataset.ratioComponent === spec.numerator) numT = typed;
@@ -1948,12 +2080,22 @@
       };
     }
 
+    function getEditOwner(metric) {
+      const key = remapMetricKey(metric);
+      const d = CFG.defaultOwners[key] || CFG.defaultOwners[metric] || { leader: "", partner: "" };
+      const o = ownersDraft[metric] || ownersDraft[key] || {};
+      return {
+        leader: o.leader !== undefined ? o.leader : d.leader,
+        partner: o.partner !== undefined ? o.partner : d.partner,
+      };
+    }
+
     function setOwner(idx, field, value) {
       if (!isTargetEditUnlocked()) return;
       const metric = metricByIdx(editMetricsList, idx);
-      if (!owners[metric]) owners[metric] = {};
-      owners[metric][field] = value;
-      saveOwners();
+      if (!ownersDraft[metric]) ownersDraft[metric] = {};
+      ownersDraft[metric][field] = value;
+      markTargetSheetDirty();
     }
 
     function getSnowflakeActual(metric, idx) {
@@ -2039,13 +2181,12 @@
 
     function getTarget(metric, monthKey) {
       if (isYearlyTargetMetric(metric)) return null;
-      const k = cellKey(metric, monthKey);
-      if (Object.prototype.hasOwnProperty.call(targets, k)) {
-        const v = targets[k];
-        if (v === null || v === "") return null;
-        return Number(v);
-      }
-      return getDefaultTarget(metric, monthKey);
+      return getTargetValue(metric, monthKey, false);
+    }
+
+    function getEditTarget(metric, monthKey) {
+      if (isYearlyTargetMetric(metric)) return null;
+      return getTargetValue(metric, monthKey, true);
     }
 
     function setTargetIdx(idx, monthKey, raw, finalize) {
@@ -2056,17 +2197,16 @@
       const k = cellKey(metric, storageMonth);
       const trimmed = String(raw).trim();
       if (trimmed === "") {
-        if (getDefaultTarget(metric, storageMonth) !== null) targets[k] = null;
-        else delete targets[k];
+        if (getDefaultTarget(metric, storageMonth) !== null) targetDraft[k] = null;
+        else delete targetDraft[k];
       } else if (isTextMetric(metric)) {
-        targets[k] = trimmed;
+        targetDraft[k] = trimmed;
       } else {
         const n = parseTargetRaw(trimmed);
         if (n === null) { if (!finalize) return; return; }
-        targets[k] = normalizeTargetValue(metric, n);
+        targetDraft[k] = normalizeTargetValue(metric, n);
       }
-      if (finalize) saveTargets(true);
-      else persistDraft();
+      markTargetSheetDirty();
     }
 
     function finalizeTargetInput(inp) {
@@ -2465,9 +2605,9 @@
       return `<span class="src-badge ${cls}">${label}</span>`;
     }
 
-    function ownerCellHtml(idx, field) {
+    function ownerCellHtml(idx, field, useDraft) {
       const metric = metricByIdx(editMetricsList, idx);
-      const val = escAttr(getOwner(metric)[field] || "");
+      const val = escAttr((useDraft ? getEditOwner(metric) : getOwner(metric))[field] || "");
       const ro = !isTargetEditUnlocked() ? ' readonly tabindex="-1"' : "";
       return `<input type="text" class="meta-input owner-input" data-idx="${idx}" data-field="${field}" value="${val}" placeholder="—"${ro}/>`;
     }
@@ -2721,12 +2861,20 @@
         clearTimeout(debounce);
         debounce = setTimeout(() => {
           const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
-          setMetricNote(metric, inp.dataset.month, inp.dataset.kind, inp.value, false);
+          if (inp.dataset.kind === "target") {
+            setMetricNoteDraft(metric, inp.dataset.month, inp.dataset.kind, inp.value);
+          } else {
+            setMetricNote(metric, inp.dataset.month, inp.dataset.kind, inp.value, false);
+          }
         }, 400);
       });
       inp.addEventListener("blur", () => {
         const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
-        setMetricNote(metric, inp.dataset.month, inp.dataset.kind, inp.value, true);
+        if (inp.dataset.kind === "target") {
+          setMetricNoteDraft(metric, inp.dataset.month, inp.dataset.kind, inp.value);
+        } else {
+          setMetricNote(metric, inp.dataset.month, inp.dataset.kind, inp.value, true);
+        }
       });
       inp.addEventListener("keydown", (e) => {
         if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
@@ -3040,15 +3188,15 @@
             + yearlyTargetEditCellHtml(mIdx, metric);
         } else {
           cells = months.map(monthKey => {
-            const tgt = getTarget(metric, monthKey);
+            const tgt = getEditTarget(metric, monthKey);
             const tgtShown = tgt === null ? "" : formatTargetInput(metric, tgt);
             return `<td><div class="target-only-cell">`
               + valueInputHtml(mIdx, monthKey, "target", tgtShown)
               + `</div></td>`;
           }).join("") + yearlyTargetEditCellHtml(mIdx, metric);
         }
-        return `<tr class="${rowCls}"><td class="leader-col">${ownerCellHtml(mIdx, "leader")}</td>`
-          + `<td class="partner-col">${ownerCellHtml(mIdx, "partner")}</td>`
+        return `<tr class="${rowCls}"><td class="leader-col">${ownerCellHtml(mIdx, "leader", true)}</td>`
+          + `<td class="partner-col">${ownerCellHtml(mIdx, "partner", true)}</td>`
           + `<td class="metric-cell">${editMetricCellHtml(metric)}</td>${cells}</tr>`;
       }).join("");
 
@@ -3078,9 +3226,9 @@
         inp.addEventListener("input", () => {
           if (!isTargetEditUnlocked()) return;
           const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
-          if (!owners[metric]) owners[metric] = {};
-          owners[metric][inp.dataset.field] = inp.value;
-          persistDraft();
+          if (!ownersDraft[metric]) ownersDraft[metric] = {};
+          ownersDraft[metric][inp.dataset.field] = inp.value;
+          markTargetSheetDirty();
         });
         inp.addEventListener("blur", () => setOwner(Number(inp.dataset.idx), inp.dataset.field, inp.value.trim()));
       });
@@ -3115,6 +3263,7 @@
     });
 
     document.getElementById("btnUnlockTargets").addEventListener("click", openTargetPinModal);
+    document.getElementById("btnSaveTargets").addEventListener("click", saveTargetSheet);
     document.getElementById("btnLockTargets").addEventListener("click", lockTargetEditing);
     document.getElementById("targetPinCancel").addEventListener("click", closeTargetPinModal);
     document.getElementById("targetPinSubmit").addEventListener("click", submitTargetPin);
