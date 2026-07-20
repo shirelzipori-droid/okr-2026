@@ -112,10 +112,18 @@ STORAGE_DC_UNITS = "okr2026_dc_units_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
+STORAGE_METRIC_NOTES = "okr2026_metric_notes_v1"
 TARGET_EDIT_PIN = "1618"  # 4-digit PIN to unlock Target tab editing
 TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
 
-# For review → Main KPIs insert order when user clicks "Use in dashboard".
+# Snowflake cache keys that differ from current metric display names.
+ACTUALS_LEGACY_ALIASES: dict[str, str] = {
+    "Available Product Selection": "Area Product Selection",
+}
+# Yearly KPIs with a companion free-text field (vendors / categories list).
+METRICS_WITH_NOTES: list[str] = [
+    "New special vendors or categories",
+]
 REVIEW_PROMOTION_MAIN: list[list[str]] = [
     ["FTU", "DDE FEE/order"],
     ["FTU Conversion", "FTU"],
@@ -280,7 +288,7 @@ METRIC_FORMAT: dict[str, str] = {
     "3PFL GOV (yearly)": "integer",
     "Turning B stores to A": "integer",
     "Awareness": "percent:1",
-    "New special vendors or categories": "text",
+    "New special vendors or categories": "integer",
     "DC UNITS": "integer",
     "SOLD UNITS": "integer",
     "DC": "percent:1",
@@ -373,6 +381,12 @@ def _build_payload(
     for name in ALL_METRIC_NAMES:
         if name in actuals_snow:
             actuals[name] = _pad_series(actuals_snow[name])
+        elif name in ACTUALS_LEGACY_ALIASES:
+            legacy = ACTUALS_LEGACY_ALIASES[name]
+            if legacy in actuals_snow:
+                actuals[name] = _pad_series(actuals_snow[legacy])
+            else:
+                actuals[name] = [None] * DASHBOARD_MONTH_COUNT
         else:
             actuals[name] = [None] * DASHBOARD_MONTH_COUNT
     for component in RATIO_COMPONENT_METRICS:
@@ -501,6 +515,8 @@ def _build_payload(
         "vpAbsoluteK": vp_absolute_k,
         "govK": gov_k,
         "format": format_map,
+        "actualsLegacyAliases": ACTUALS_LEGACY_ALIASES,
+        "metricsWithNotes": METRICS_WITH_NOTES,
         "storage": {
             "targets": STORAGE_TARGETS,
             "actuals": STORAGE_ACTUALS,
@@ -508,6 +524,7 @@ def _build_payload(
             "owners": STORAGE_OWNERS,
             "soldChoice": STORAGE_SOLD_CHOICE,
             "promotedReview": STORAGE_PROMOTED_REVIEW,
+            "metricNotes": STORAGE_METRIC_NOTES,
             "targetUnlockSession": TARGET_UNLOCK_SESSION_KEY,
         },
         "targetEditPin": TARGET_EDIT_PIN,
@@ -1043,6 +1060,25 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       font-size: 10px; color: #9d174d; font-weight: 700;
       letter-spacing: 0.04em; text-transform: uppercase;
     }
+    .value-with-note {
+      display: flex; flex-direction: row; flex-wrap: wrap;
+      align-items: center; justify-content: center; gap: 6px; width: 100%;
+    }
+    .value-with-note .actual-inline-input,
+    .value-with-note .target-input {
+      flex: 0 0 72px; max-width: 88px; min-width: 56px;
+    }
+    .metric-note-input {
+      flex: 1 1 140px; min-width: 100px; max-width: 100%;
+      background: #fff; border: 1px solid var(--border); border-radius: 10px;
+      color: var(--text); padding: 6px 8px; font-size: 11px; font-weight: 500;
+      text-align: left;
+    }
+    .metric-note-input:focus { outline: none; border-color: var(--wolt-cyan); box-shadow: 0 0 0 2px rgba(0,194,232,0.2); }
+    .metric-note-display {
+      margin-top: 4px; font-size: 10px; font-weight: 600; color: var(--muted);
+      line-height: 1.3; text-align: center; word-break: break-word;
+    }
     .cell-actual.yearly-month {
       background: #fafafa;
       border-color: #e5e7eb;
@@ -1327,6 +1363,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     let dcUnitsByMonth = {};
     const DC_UNITS_COMPONENT = "DC UNITS";
     let owners = {};
+    let metricNotes = {};
     let storageOk = true;
     let saveTimer = null;
     let activeTargetInput = null;
@@ -1712,12 +1749,56 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
     }
 
+    function migrateVendorsTextToNotes() {
+      const metric = "New special vendors or categories";
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      for (const kind of ["actual", "target"]) {
+        const store = kind === "actual" ? actualOverrides : targets;
+        const k = cellKey(metric, yKey);
+        const v = store[k];
+        if (v === undefined || v === null || v === "") continue;
+        if (Number.isFinite(Number(v))) continue;
+        const nk = noteStorageKey(metric, yKey, kind);
+        if (!metricNotes[nk]) metricNotes[nk] = String(v);
+        delete store[k];
+      }
+    }
+
+    function isMetricWithNotes(metric) {
+      return (CFG.metricsWithNotes || []).includes(metric);
+    }
+
+    function noteStorageKey(metric, monthKey, kind) {
+      return metric + "|" + monthKey + "|" + (kind === "target" ? "target_note" : "actual_note");
+    }
+
+    function getMetricNote(metric, monthKey, kind) {
+      return metricNotes[noteStorageKey(metric, monthKey, kind)] || "";
+    }
+
+    function setMetricNote(metric, monthKey, kind, raw, finalize) {
+      const k = noteStorageKey(metric, monthKey, kind);
+      const trimmed = String(raw).trim();
+      if (trimmed === "") delete metricNotes[k];
+      else metricNotes[k] = trimmed;
+      if (finalize) saveMetricNotes(true);
+      else persistDraft();
+    }
+
+    function saveMetricNotes(refreshViews) {
+      persistJson(CFG.storage.metricNotes, metricNotes, "__okrMetricNotesMem");
+      if (refreshViews) showPersistToast("Notes saved");
+    }
+
     targets = loadJson(CFG.storage.targets, {}, "__okrTargetsMem");
     actualOverrides = loadJson(CFG.storage.actuals, {}, "__okrActualsMem");
     owners = loadJson(CFG.storage.owners, {}, "__okrOwnersMem");
+    metricNotes = loadJson(CFG.storage.metricNotes, {}, "__okrMetricNotesMem");
     migrateRenamedMetricKeys(targets);
     migrateRenamedMetricKeys(actualOverrides);
     migrateRenamedMetricKeys(owners);
+    migrateRenamedMetricKeys(metricNotes);
+    migrateVendorsTextToNotes();
     loadDcUnitsStore();
 
     function showPersistToast(label) {
@@ -1735,6 +1816,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
       persistJson(CFG.storage.actuals, actualOverrides, "__okrActualsMem");
       persistJson(CFG.storage.owners, owners, "__okrOwnersMem");
+      persistJson(CFG.storage.metricNotes, metricNotes, "__okrMetricNotesMem");
       const toast = document.getElementById("saveToast");
       toast.textContent = storageOk ? (label || "Saved") : (label || "Saved") + " (session only)";
       toast.classList.add("show");
@@ -1753,6 +1835,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
       persistJson(CFG.storage.actuals, actualOverrides, "__okrActualsMem");
       persistJson(CFG.storage.owners, owners, "__okrOwnersMem");
+      persistJson(CFG.storage.metricNotes, metricNotes, "__okrMetricNotesMem");
     }
 
     function saveTargets(finalize) { saveAll("Targets saved", !!finalize); }
@@ -2061,9 +2144,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const yKey = CFG.yearlyTargetKey || "yearly";
       const yt = getYearlyTargetDisplay(metric);
       const tgtShown = yt === null ? "" : formatTargetInput(metric, yt);
+      const targetField = isMetricWithNotes(metric)
+        ? valueWithNoteInputHtml(metric, mIdx, yKey, "target", tgtShown, getMetricNote(metric, yKey, "target"))
+        : valueInputHtml(mIdx, yKey, "target", tgtShown);
       return `<td class="yearly-target-col"><div class="target-only-cell yearly-target-cell">`
         + `<span class="yearly-target-lbl">Yearly Target</span>`
-        + valueInputHtml(mIdx, yKey, "target", tgtShown)
+        + targetField
         + `</div></td>`;
     }
 
@@ -2843,8 +2929,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         cls += " no-target";
       }
       const actualHtml = (manual && mIdx !== undefined)
-        ? actualInlineInputHtml(metric, mIdx, yKey, actualShown)
-        : `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
+        ? (isMetricWithNotes(metric)
+          ? valueWithNoteInputHtml(metric, mIdx, yKey, "actual", actualShown, getMetricNote(metric, yKey, "actual"))
+          : actualInlineInputHtml(metric, mIdx, yKey, actualShown))
+        : `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
+          + (isMetricWithNotes(metric) && getMetricNote(metric, yKey, "actual")
+            ? `<div class="metric-note-display">${escHtml(getMetricNote(metric, yKey, "actual"))}</div>` : "");
       return `<td colspan="${monthCount}" class="yearly-target-col"><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}</div>${targetHtml}</div></td>`;
     }
 
@@ -3088,6 +3178,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return `<input type="text"${modeAttr} class="actual-inline-input value-input" data-kind="actual" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
     }
 
+    function valueWithNoteInputHtml(metric, mIdx, monthKey, kind, valueShown, noteShown) {
+      const numHtml = kind === "actual"
+        ? actualInlineInputHtml(metric, mIdx, monthKey, valueShown)
+        : valueInputHtml(mIdx, monthKey, kind, valueShown);
+      const notePh = kind === "target" ? "Which vendors (target)" : "Which vendors added";
+      const lockAttrs = (kind === "target" && !isTargetEditUnlocked()) ? ' readonly tabindex="-1"' : "";
+      const noteInp = `<input type="text" class="metric-note-input value-input" data-note="1" data-kind="${kind}" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(noteShown)}" placeholder="${notePh}"${lockAttrs}/>`;
+      return `<div class="value-with-note">${numHtml}${noteInp}</div>`;
+    }
+
     function handleDcUnitsInput(inp) {
       const monthKey = inp.dataset.month;
       const trimmed = String(inp.value).trim();
@@ -3146,7 +3246,33 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function bindPerformanceActualInputs(root) {
       root.querySelectorAll(".actual-inline-input").forEach(inp => bindValueInput(inp));
+      root.querySelectorAll(".metric-note-input").forEach(inp => bindMetricNoteInput(inp));
       hydrateDcUnitInputs(root);
+    }
+
+    function bindMetricNoteInput(inp) {
+      let debounce = null;
+      inp.addEventListener("focus", () => {
+        if (inp.dataset.kind === "target" && !isTargetEditUnlocked()) {
+          inp.blur();
+          openTargetPinModal();
+          return;
+        }
+      });
+      inp.addEventListener("input", () => {
+        clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
+          setMetricNote(metric, inp.dataset.month, inp.dataset.kind, inp.value, false);
+        }, 400);
+      });
+      inp.addEventListener("blur", () => {
+        const metric = metricByIdx(editMetricsList, Number(inp.dataset.idx));
+        setMetricNote(metric, inp.dataset.month, inp.dataset.kind, inp.value, true);
+      });
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); inp.blur(); }
+      });
     }
 
     function renderPeriodChips() {
@@ -3370,6 +3496,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function bindValueInput(inp) {
+      if (inp.dataset.note === "1") {
+        bindMetricNoteInput(inp);
+        return;
+      }
       let debounce = null;
       inp.addEventListener("focus", () => {
         if (inp.dataset.kind === "target" && !isTargetEditUnlocked()) {
