@@ -605,10 +605,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .wrap { max-width: none; margin: 0 auto; padding: 16px 10px 40px; }
     .brand-header {
       background: linear-gradient(128deg, rgba(0, 194, 232, 0.95) 0%, rgba(0, 152, 189, 0.92) 55%, rgba(0, 122, 148, 0.88) 100%);
-      border-radius: 36px;
-      padding: 48px 64px;
-      margin-bottom: 28px;
-      min-height: 168px;
+      border-radius: 32px;
+      padding: 28px 32px;
+      margin-bottom: 24px;
       box-shadow: var(--shadow-lg);
       position: relative;
       overflow: hidden;
@@ -619,9 +618,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       content: "";
       position: absolute;
       top: -40%;
-      right: -5%;
-      width: 440px;
-      height: 440px;
+      right: -8%;
+      width: 280px;
+      height: 280px;
       background: radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 70%);
       pointer-events: none;
     }
@@ -630,8 +629,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       position: absolute;
       bottom: -50%;
       left: 5%;
-      width: 320px;
-      height: 320px;
+      width: 200px;
+      height: 200px;
       background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
       pointer-events: none;
     }
@@ -639,27 +638,27 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       display: grid;
       grid-template-columns: auto 1fr;
       align-items: center;
-      gap: 32px;
+      gap: 22px;
       position: relative;
       z-index: 1;
-      min-height: 152px;
+      min-height: 96px;
     }
     .wm-logo {
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 28px;
+      border-radius: 24px;
       overflow: hidden;
-      box-shadow: 0 14px 42px rgba(0, 60, 80, 0.3);
+      box-shadow: 0 12px 36px rgba(0, 60, 80, 0.3);
       line-height: 0;
-      height: 152px;
+      height: 96px;
     }
     .wm-logo-img {
       display: block;
       height: 100%;
       width: auto;
-      max-width: 440px;
+      max-width: 280px;
       object-fit: contain;
     }
     .brand-text {
@@ -668,24 +667,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       top: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      width: min(92%, 920px);
+      min-width: 240px;
       pointer-events: none;
     }
     .brand-text h1 {
-      margin: 0 0 10px;
+      margin: 0 0 4px;
       font-family: var(--font-ui);
-      font-size: clamp(2.25rem, 4.2vw, 3.25rem);
+      font-size: 2.75rem;
       font-weight: 700;
       letter-spacing: -0.04em;
       color: #fff;
-      line-height: 1.08;
+      line-height: 1.1;
     }
     .brand-text .subtitle {
-      color: rgba(255, 255, 255, 0.92);
-      font-size: clamp(1rem, 1.75vw, 1.35rem);
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 14px;
       margin: 0;
       font-weight: 500;
-      letter-spacing: 0.01em;
     }
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
