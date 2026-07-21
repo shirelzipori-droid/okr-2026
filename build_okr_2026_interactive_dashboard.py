@@ -1006,6 +1006,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       display: block; font-size: 9px; font-weight: 600; text-transform: uppercase;
       letter-spacing: 0.04em; color: var(--wolt-cyan-dark); margin-bottom: 2px;
     }
+    .manual-fill-wrap {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; width: 100%;
+    }
+    .manual-fill-lbl {
+      display: block; font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.04em; color: var(--wolt-cyan-deep); line-height: 1.2;
+    }
     .gap-yearly-target {
       margin-top: 8px; padding: 8px 10px; border-radius: var(--radius-sm);
       background: #fdf4ff; border: 1.5px solid #f5d0fe; text-align: center;
@@ -3193,12 +3201,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         cls += " no-target";
       }
       const actualHtml = (manual && mIdx !== undefined)
-        ? (isMetricWithNotes(metric)
-          ? valueWithNoteInputHtml(metric, mIdx, yKey, "actual", actualShown, getMetricNote(metric, yKey, "actual"))
-          : actualInlineInputHtml(metric, mIdx, yKey, actualShown))
+        ? manualActualInputHtml(metric, mIdx, yKey, actualShown)
         : `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`
-          + (isMetricWithNotes(metric) && getMetricNote(metric, yKey, "actual")
-            ? `<div class="metric-note-display">${escHtml(getMetricNote(metric, yKey, "actual"))}</div>` : "");
       return `<td colspan="${monthCount}" class="yearly-target-col"><div class="perf-cell-wrap"><div class="${cls}">${actualHtml}</div>${targetHtml}</div></td>`;
     }
 
@@ -3214,7 +3218,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       else cls += " no-target has-target";
       let actualHtml = "";
       if (manual && mIdx !== undefined) {
-        actualHtml = actualInlineInputHtml(metric, mIdx, monthKey, actualShown);
+        actualHtml = manualActualInputHtml(metric, mIdx, monthKey, actualShown);
       } else {
         actualHtml = `<div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div>`;
       }
@@ -3440,6 +3444,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const ph = targetPlaceholder(metric);
       const modeAttr = isTextMetric(metric) ? "" : ' inputmode="decimal"';
       return `<input type="text"${modeAttr} class="actual-inline-input value-input" data-kind="actual" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
+    }
+
+    function manualFillLabelHtml() {
+      return `<span class="manual-fill-lbl">Manual fill</span>`;
+    }
+
+    function manualActualInputHtml(metric, mIdx, monthKey, shown) {
+      const inner = isMetricWithNotes(metric)
+        ? valueWithNoteInputHtml(metric, mIdx, monthKey, "actual", shown, getMetricNote(metric, monthKey, "actual"))
+        : actualInlineInputHtml(metric, mIdx, monthKey, shown);
+      return `<div class="manual-fill-wrap">${manualFillLabelHtml()}${inner}</div>`;
     }
 
     function valueWithNoteInputHtml(metric, mIdx, monthKey, kind, valueShown, noteShown) {
