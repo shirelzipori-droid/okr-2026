@@ -3447,7 +3447,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function manualFillLabelHtml() {
-      return `<span class="manual-fill-lbl">Manual fill</span>`;
+      return `<span class="manual-fill-lbl">YTD</span>`;
     }
 
     function manualActualInputHtml(metric, mIdx, monthKey, shown) {
