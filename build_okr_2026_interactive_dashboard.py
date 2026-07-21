@@ -124,6 +124,12 @@ ACTUALS_LEGACY_ALIASES: dict[str, str] = {
 METRICS_WITH_NOTES: list[str] = [
     "New special vendors or categories",
 ]
+# KPI by Leader — manual actual cell label: YTD vs Manual Fill
+YTD_ACTUAL_LABEL_METRICS: list[str] = [
+    "IDP & HQ training",
+    "Internal Mobility",
+    "OPS Training",
+]
 REVIEW_PROMOTION_MAIN: list[list[str]] = [
     ["FTU", "DDE FEE/order"],
     ["FTU Conversion", "FTU"],
@@ -517,6 +523,7 @@ def _build_payload(
         "format": format_map,
         "actualsLegacyAliases": ACTUALS_LEGACY_ALIASES,
         "metricsWithNotes": METRICS_WITH_NOTES,
+        "ytdActualLabelMetrics": YTD_ACTUAL_LABEL_METRICS,
         "storage": {
             "targets": STORAGE_TARGETS,
             "actuals": STORAGE_ACTUALS,
