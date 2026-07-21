@@ -605,9 +605,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     .wrap { max-width: none; margin: 0 auto; padding: 16px 10px 40px; }
     .brand-header {
       background: linear-gradient(128deg, rgba(0, 194, 232, 0.95) 0%, rgba(0, 152, 189, 0.92) 55%, rgba(0, 122, 148, 0.88) 100%);
-      border-radius: 32px;
-      padding: 28px 32px;
-      margin-bottom: 24px;
+      border-radius: 36px;
+      padding: 48px 64px;
+      margin-bottom: 28px;
+      min-height: 168px;
       box-shadow: var(--shadow-lg);
       position: relative;
       overflow: hidden;
@@ -618,9 +619,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       content: "";
       position: absolute;
       top: -40%;
-      right: -8%;
-      width: 280px;
-      height: 280px;
+      right: -5%;
+      width: 440px;
+      height: 440px;
       background: radial-gradient(circle, rgba(255,255,255,0.22) 0%, transparent 70%);
       pointer-events: none;
     }
@@ -629,8 +630,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       position: absolute;
       bottom: -50%;
       left: 5%;
-      width: 200px;
-      height: 200px;
+      width: 320px;
+      height: 320px;
       background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
       pointer-events: none;
     }
@@ -638,27 +639,27 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       display: grid;
       grid-template-columns: auto 1fr;
       align-items: center;
-      gap: 22px;
+      gap: 32px;
       position: relative;
       z-index: 1;
-      min-height: 96px;
+      min-height: 152px;
     }
     .wm-logo {
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 24px;
+      border-radius: 28px;
       overflow: hidden;
-      box-shadow: 0 12px 36px rgba(0, 60, 80, 0.3);
+      box-shadow: 0 14px 42px rgba(0, 60, 80, 0.3);
       line-height: 0;
-      height: 96px;
+      height: 152px;
     }
     .wm-logo-img {
       display: block;
       height: 100%;
       width: auto;
-      max-width: 280px;
+      max-width: 440px;
       object-fit: contain;
     }
     .brand-text {
@@ -667,23 +668,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       top: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
-      min-width: 240px;
+      width: min(92%, 920px);
       pointer-events: none;
     }
     .brand-text h1 {
-      margin: 0 0 4px;
+      margin: 0 0 10px;
       font-family: var(--font-ui);
-      font-size: 1.75rem;
+      font-size: clamp(2.25rem, 4.2vw, 3.25rem);
       font-weight: 700;
       letter-spacing: -0.04em;
       color: #fff;
-      line-height: 1.1;
+      line-height: 1.08;
     }
     .brand-text .subtitle {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 14px;
+      color: rgba(255, 255, 255, 0.92);
+      font-size: clamp(1rem, 1.75vw, 1.35rem);
       margin: 0;
       font-weight: 500;
+      letter-spacing: 0.01em;
     }
     .toolbar {
       display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;
@@ -3453,15 +3455,16 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return `<input type="text"${modeAttr} class="actual-inline-input value-input" data-kind="actual" data-idx="${mIdx}" data-month="${monthKey}" value="${escAttr(shown)}" placeholder="${ph}"/>`;
     }
 
-    function manualFillLabelHtml() {
-      return `<span class="manual-fill-lbl">YTD</span>`;
+    function manualFillLabelHtml(metric) {
+      const useYtd = (CFG.ytdActualLabelMetrics || []).includes(metric);
+      return `<span class="manual-fill-lbl">${useYtd ? "YTD" : "Manual Fill"}</span>`;
     }
 
     function manualActualInputHtml(metric, mIdx, monthKey, shown) {
       const inner = isMetricWithNotes(metric)
         ? valueWithNoteInputHtml(metric, mIdx, monthKey, "actual", shown, getMetricNote(metric, monthKey, "actual"))
         : actualInlineInputHtml(metric, mIdx, monthKey, shown);
-      return `<div class="manual-fill-wrap">${manualFillLabelHtml()}${inner}</div>`;
+      return `<div class="manual-fill-wrap">${manualFillLabelHtml(metric)}${inner}</div>`;
     }
 
     function valueWithNoteInputHtml(metric, mIdx, monthKey, kind, valueShown, noteShown) {
