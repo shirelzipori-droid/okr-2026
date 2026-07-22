@@ -1,4 +1,5 @@
 snowflake_secrets.env
+okr_2026_firebase_config.json
 __pycache__/
 *.pyc
 .DS_Store

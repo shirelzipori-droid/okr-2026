@@ -91,6 +91,20 @@ def _dashboard_not_certified_explores() -> list[dict[str, str]]:
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+def _load_firebase_config() -> dict:
+    if not FIREBASE_CONFIG_PATH.is_file():
+        return {}
+    try:
+        raw = json.loads(FIREBASE_CONFIG_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+    if not isinstance(raw, dict) or not raw.get("databaseURL"):
+        return {}
+    return raw
+
+
 OUT_HTML = ROOT / "auto_outputs" / "okr_2026_interactive_dashboard.html"
 PAGES_HTML = ROOT / "docs" / "index.html"
 LOGO_PATH = ROOT / "assets" / "wolt_market_logo.png"
@@ -113,8 +127,13 @@ STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
 STORAGE_METRIC_NOTES = "okr2026_metric_notes_v1"
-TARGET_EDIT_PIN = "4351"  # 4-digit PIN to unlock Target tab editing
+TARGET_EDIT_PIN = "4531"  # 4-digit PIN to unlock Target tab editing
 TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
+SHARED_TARGETS_RAW_URL = (
+    "https://raw.githubusercontent.com/shirelzipori-droid/okr-2026/main/"
+    "okr_2026_published_targets.json"
+)
+FIREBASE_CONFIG_PATH = ROOT / "okr_2026_firebase_config.json"
 
 # Snowflake cache keys that differ from current metric display names.
 ACTUALS_LEGACY_ALIASES: dict[str, str] = {
@@ -499,7 +518,9 @@ def _build_payload(
         "monthLabels": MONTH_LABELS,
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
-        "defaultTargetsNote": "Dashboard Target tab defaults · yearly via okr_2026_published_targets.json · edit PIN 4351",
+        "defaultTargetsNote": "Shared targets via Firebase · Save updates link for everyone · PIN 4531",
+        "sharedTargetsRawUrl": SHARED_TARGETS_RAW_URL,
+        "firebase": _load_firebase_config(),
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
@@ -923,12 +944,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       background: #059669; border-color: #059669; color: #fff;
     }
     .btn-target-save:disabled { opacity: 0.45; cursor: not-allowed; }
-    .btn-target-publish {
-      background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8;
-      border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700;
-      cursor: pointer; font-family: var(--font-ui);
-    }
-    .btn-target-publish:hover { background: #dbeafe; border-color: #60a5fa; }
+    .target-sync-note { font-size: 11px; color: #047857; font-weight: 600; }
     .target-paste-hint {
       font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4;
     }
@@ -1325,14 +1341,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <span id="targetLockStatus">🔒 Locked — enter PIN to edit</span>
           <button type="button" class="btn-target-lock primary" id="btnUnlockTargets">Enter PIN</button>
           <button type="button" class="btn-target-save hidden" id="btnSaveTargets" disabled>Save targets</button>
-          <button type="button" class="btn-target-publish hidden" id="btnPublishTargets" title="Download yearly targets for GitHub Pages">Publish for sharing</button>
+          <span class="target-sync-note hidden" id="targetSyncNote">☁️ Save updates targets for everyone on the link</span>
           <button type="button" class="btn-target-lock hidden" id="btnLockTargets">Lock editing</button>
         </div>
         <p class="target-paste-hint hidden" id="targetPasteHint">
           <strong>Bulk paste from Excel:</strong> copy a row of months (Tab-separated) → click the first month cell → Ctrl+V.
-          Paste applies through Dec + optional Yearly column. Then click <strong>Save targets</strong>.
-          <br><strong>Share link:</strong> after saving, click <strong>Publish for sharing</strong> → save as
-          <code>okr_2026_published_targets.json</code> in the repo → rebuild &amp; push so others see Yearly Target.
+          Paste applies through Dec + optional Yearly column. Then click <strong>Save targets</strong> —
+          changes sync automatically to everyone opening the shared link (within ~2 min).
         </p>
       </div>
       <div class="table-scroll">
@@ -1394,6 +1409,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
   <div class="save-toast" id="saveToast">Saved</div>
 
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script>
     const CFG = __PAYLOAD__;
 
@@ -1408,6 +1425,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     let owners = {};
     let metricNotes = {};
     let targetDraft = {};
+    let sharedTargets = {};
+    let sharedTargetsPollTimer = null;
     let ownersDraft = {};
     let metricNotesDraft = {};
     let targetSheetDirty = false;
@@ -1425,7 +1444,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function resetTargetSheetDraft() {
-      targetDraft = cloneStore(targets);
+      targetDraft = {};
       ownersDraft = cloneStore(owners);
       metricNotesDraft = cloneStore(metricNotes);
       targetSheetDirty = false;
@@ -1470,25 +1489,86 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       });
     }
 
-    function saveTargetSheet() {
-      if (!isTargetEditUnlocked()) return;
-      flushPendingTargetInputs();
-      targets = cloneStore(targetDraft);
-      owners = cloneStore(ownersDraft);
-      for (const k of Object.keys(metricNotes)) {
-        if (k.endsWith("|target_note")) delete metricNotes[k];
-      }
-      for (const [k, v] of Object.entries(metricNotesDraft)) {
-        if (k.endsWith("|target_note")) metricNotes[k] = v;
-      }
-      saveAll("Targets saved", true);
-      resetTargetSheetDraft();
-      applyTargetEditLockState();
-      renderEdit();
-      downloadPublishedTargets(false);
+    function getSharedTarget(metric, monthKey) {
+      const k = cellKey(metric, monthKey);
+      if (!Object.prototype.hasOwnProperty.call(sharedTargets, k)) return undefined;
+      const v = sharedTargets[k];
+      if (v === null || v === "") return null;
+      return isTextMetric(metric) ? String(v) : Number(v);
     }
 
-    function collectPublishedYearlyTargets() {
+    function normalizeSharedTargetsPayload(raw) {
+      const out = {};
+      if (!raw || typeof raw !== "object") return out;
+      for (const [k, v] of Object.entries(raw)) {
+        if (String(k).startsWith("_") || v === null || v === "") continue;
+        out[k] = v;
+      }
+      return out;
+    }
+
+    let firebaseDb = null;
+    let firebaseReady = false;
+
+    function applySharedTargetsPayload(raw, silent) {
+      sharedTargets = normalizeSharedTargetsPayload(raw);
+      if (!silent) {
+        renderPerformance();
+        renderLeader();
+        renderEdit();
+        updateHintBanner();
+        updateSummary();
+        updateLeaderSummary();
+      }
+    }
+
+    async function fetchSharedTargetsFallback(silent) {
+      const rawUrl = CFG.sharedTargetsRawUrl;
+      if (!rawUrl) return false;
+      try {
+        const res = await fetch(rawUrl + "?t=" + Date.now(), { cache: "no-store" });
+        if (!res.ok) return false;
+        applySharedTargetsPayload(await res.json(), silent);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function initFirebaseSharedTargets() {
+      const fb = CFG.firebase;
+      if (!fb || !fb.databaseURL || typeof firebase === "undefined") return false;
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(fb);
+        firebaseDb = firebase.database();
+        firebaseDb.ref("targets").on("value", (snap) => {
+          applySharedTargetsPayload(snap.val() || {}, true);
+          renderPerformance();
+          renderLeader();
+          renderEdit();
+          updateHintBanner();
+          updateSummary();
+          updateLeaderSummary();
+        });
+        firebaseReady = true;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    async function publishSharedTargets(payload) {
+      if (!firebaseDb) return { ok: false, reason: "no_firebase" };
+      try {
+        await firebaseDb.ref("targets").set(payload);
+        sharedTargets = { ...payload };
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, reason: "firebase_error" };
+      }
+    }
+
+    function collectAllSharedTargetsFromDraft() {
       flushPendingTargetInputs();
       const out = {};
       const yKey = CFG.yearlyTargetKey || "yearly";
@@ -1497,34 +1577,71 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         : [...(CFG.mainMetrics || []), ...(CFG.leaderMetrics || [])];
       metrics.forEach(metric => {
         if (isRatioMetric(metric)) {
-          const pct = getRatioYearlyTargetPct(metric);
+          const pct = getEditRatioYearlyTargetPct(metric);
           if (pct !== null) out[cellKey(metric, yKey)] = pct;
           return;
         }
-        const yt = getYearlyTarget(metric);
-        if (yt !== null && yt !== undefined && yt !== "") {
-          out[cellKey(metric, yKey)] = yt;
+        if (isYearlySingleCellMetric(metric)) {
+          const yt = getEditYearlyTargetDisplay(metric);
+          if (yt !== null && yt !== undefined && yt !== "") out[cellKey(metric, yKey)] = yt;
+          return;
         }
+        CFG.monthKeys.forEach(mk => {
+          const t = getTargetValue(metric, mk, true);
+          if (t !== null && t !== undefined && t !== "") out[cellKey(metric, mk)] = t;
+        });
+        const yt = getEditYearlyTargetDisplay(metric);
+        if (yt !== null && yt !== undefined && yt !== "") out[cellKey(metric, yKey)] = yt;
       });
       return out;
     }
 
-    function downloadPublishedTargets(fromButton) {
-      const payload = collectPublishedYearlyTargets();
-      const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "okr_2026_published_targets.json";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      const n = Object.keys(payload).length;
-      const msg = fromButton
-        ? `Downloaded ${n} yearly target(s) — save file in repo & rebuild`
-        : `Targets saved · downloaded ${n} yearly target(s) for sharing`;
-      showSaveToast(msg);
+    async function migrateLegacyLocalTargetsToShared() {
+      if (!firebaseReady) return;
+      const legacy = loadJson(CFG.storage.targets, {}, "__okrTargetsMem");
+      if (!Object.keys(legacy).length) return;
+      const merged = { ...sharedTargets };
+      for (const [k, v] of Object.entries(legacy)) {
+        if (v === null || v === "") continue;
+        merged[k] = v;
+      }
+      const result = await publishSharedTargets(merged);
+      if (result.ok) {
+        targets = {};
+        persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+        showSaveToast("Migrated your saved targets to the shared link");
+      }
+    }
+
+    async function saveTargetSheet() {
+      if (!isTargetEditUnlocked()) return;
+      flushPendingTargetInputs();
+      owners = cloneStore(ownersDraft);
+      for (const k of Object.keys(metricNotes)) {
+        if (k.endsWith("|target_note")) delete metricNotes[k];
+      }
+      for (const [k, v] of Object.entries(metricNotesDraft)) {
+        if (k.endsWith("|target_note")) metricNotes[k] = v;
+      }
+      const payload = collectAllSharedTargetsFromDraft();
+      showSaveToast("Saving shared targets…");
+      const result = await publishSharedTargets(payload);
+      if (result.ok) {
+        targets = {};
+        persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+        saveAll("Targets saved — updated for everyone on the link", true);
+      } else if (result.reason === "no_firebase") {
+        targets = cloneStore(targetDraft);
+        persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+        saveAll("Targets saved locally — add okr_2026_firebase_config.json & rebuild", true);
+      } else {
+        targets = cloneStore(targetDraft);
+        persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+        saveAll("Targets saved locally — cloud sync failed", true);
+      }
+      resetTargetSheetDraft();
+      applyTargetEditLockState();
+      renderEdit();
     }
 
     function parsePasteGrid(text) {
@@ -1662,8 +1779,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       if (btnUnlock) btnUnlock.classList.toggle("hidden", !locked);
       if (btnLock) btnLock.classList.toggle("hidden", locked);
-      const btnPublish = document.getElementById("btnPublishTargets");
-      if (btnPublish) btnPublish.classList.toggle("hidden", locked);
+      const syncNote = document.getElementById("targetSyncNote");
+      if (syncNote) syncNote.classList.toggle("hidden", locked);
       const pasteHint = document.getElementById("targetPasteHint");
       if (pasteHint) pasteHint.classList.toggle("hidden", locked);
       updateTargetSaveButton();
@@ -2390,13 +2507,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function getYearlyTarget(metric) {
       if (isRatioMetric(metric)) return null;
-      const k = yearlyTargetStorageKey(metric);
-      if (Object.prototype.hasOwnProperty.call(targets, k)) {
-        const v = targets[k];
-        if (v === null || v === "") return null;
-        return isTextMetric(metric) ? String(v) : Number(v);
-      }
-      const d = getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const shared = getSharedTarget(metric, yKey);
+      if (shared !== undefined && shared !== null) return shared;
+      const d = getDefaultTarget(metric, yKey);
       if (d === null || d === undefined || d === "") return null;
       return isTextMetric(metric) ? String(d) : Number(d);
     }
@@ -2409,7 +2523,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         if (v === null || v === "") return null;
         return isTextMetric(metric) ? String(v) : Number(v);
       }
-      const d = getDefaultTarget(metric, CFG.yearlyTargetKey || "yearly");
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const shared = getSharedTarget(metric, yKey);
+      if (shared !== undefined && shared !== null) return shared;
+      const d = getDefaultTarget(metric, yKey);
       if (d === null || d === undefined || d === "") return null;
       return isTextMetric(metric) ? String(d) : Number(d);
     }
@@ -2500,13 +2617,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function getTargetValue(metric, monthKey, useDraft) {
-      const store = useDraft ? targetDraft : targets;
       const k = cellKey(metric, monthKey);
-      if (Object.prototype.hasOwnProperty.call(store, k)) {
-        const v = store[k];
+      if (useDraft && Object.prototype.hasOwnProperty.call(targetDraft, k)) {
+        const v = targetDraft[k];
         if (v === null || v === "") return null;
         return isTextMetric(metric) ? String(v) : Number(v);
       }
+      const shared = getSharedTarget(metric, monthKey);
+      if (shared !== undefined && shared !== null) return shared;
       return getDefaultTarget(metric, monthKey);
     }
 
@@ -2929,7 +3047,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const k = cellKey(metric, storageMonth);
       const trimmed = String(raw).trim();
       if (trimmed === "") {
-        if (getDefaultTarget(metric, storageMonth) !== null) targetDraft[k] = null;
+        const hasBase = getDefaultTarget(metric, storageMonth) !== null
+          || getSharedTarget(metric, storageMonth) !== undefined;
+        if (hasBase) targetDraft[k] = null;
         else delete targetDraft[k];
       } else if (isTextMetric(metric)) {
         targetDraft[k] = trimmed;
@@ -4003,8 +4123,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     });
 
     document.getElementById("btnUnlockTargets").addEventListener("click", openTargetPinModal);
-    document.getElementById("btnSaveTargets").addEventListener("click", saveTargetSheet);
-    document.getElementById("btnPublishTargets").addEventListener("click", () => downloadPublishedTargets(true));
+    document.getElementById("btnSaveTargets").addEventListener("click", () => { saveTargetSheet(); });
     document.getElementById("btnLockTargets").addEventListener("click", lockTargetEditing);
     document.getElementById("targetPinCancel").addEventListener("click", closeTargetPinModal);
     document.getElementById("targetPinSubmit").addEventListener("click", submitTargetPin);
@@ -4030,6 +4149,15 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     renderReview();
     renderToDelete();
     updateHintBanner();
+
+    (async function initSharedTargets() {
+      const hasFirebase = initFirebaseSharedTargets();
+      if (!hasFirebase) {
+        await fetchSharedTargetsFallback(false);
+        sharedTargetsPollTimer = setInterval(() => fetchSharedTargetsFallback(true), 90000);
+      }
+      await migrateLegacyLocalTargetsToShared();
+    })();
   </script>
 </body>
 </html>
