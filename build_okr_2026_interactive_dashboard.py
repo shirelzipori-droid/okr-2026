@@ -1955,12 +1955,29 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       });
     }
 
+    function normalizeStringArray(raw) {
+      if (Array.isArray(raw)) return raw.filter(x => typeof x === "string" && x);
+      if (raw && typeof raw === "object") {
+        return Object.values(raw).filter(x => typeof x === "string" && x);
+      }
+      return [];
+    }
+
     function loadJson(key, fallback, memKey) {
       try {
         const raw = localStorage.getItem(key);
-        if (raw) return JSON.parse(raw);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(fallback)) return normalizeStringArray(parsed);
+          return parsed;
+        }
       } catch (e) { storageOk = false; }
-      if (memKey && window[memKey]) return { ...window[memKey] };
+      if (memKey && window[memKey] !== undefined && window[memKey] !== null) {
+        const mem = window[memKey];
+        if (Array.isArray(fallback)) return normalizeStringArray(mem);
+        if (typeof mem === "object") return { ...mem };
+        return mem;
+      }
       return fallback;
     }
 
@@ -1970,7 +1987,11 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         storageOk = true;
       } catch (e) {
         storageOk = false;
-        window[memKey] = { ...obj };
+      }
+      if (memKey) {
+        if (Array.isArray(obj)) window[memKey] = obj.slice();
+        else if (obj && typeof obj === "object") window[memKey] = { ...obj };
+        else window[memKey] = obj;
       }
     }
 
@@ -2016,8 +2037,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       persistDcUnitsStore();
     }
 
-    let soldSelectionChoice = loadJson(CFG.storage.soldChoice, null);
-    let promotedReviewMetrics = loadJson(CFG.storage.promotedReview, []);
+    let soldSelectionChoice = loadJson(CFG.storage.soldChoice, null, "__okrSoldChoiceMem");
+    let promotedReviewMetrics = loadJson(CFG.storage.promotedReview, [], "__okrPromotedReviewMem");
+    promotedReviewMetrics = normalizeStringArray(promotedReviewMetrics);
 
     function syncPromotedFromSoldChoice() {
       const vm = resolveSoldVariantMetric();
@@ -2115,7 +2137,24 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return metric;
     }
 
-    function refreshViewsAfterPromotion(toastMsg) {
+    function switchToTab(tabId) {
+      const tab = document.querySelector(`.tab[data-tab="${tabId}"]`);
+      if (!tab) return;
+      document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      document.getElementById("panelPerformance").classList.toggle("hidden", tabId !== "performance");
+      document.getElementById("panelLeader").classList.toggle("hidden", tabId !== "leader");
+      document.getElementById("panelEdit").classList.toggle("hidden", tabId !== "edit");
+      document.getElementById("panelReview").classList.toggle("hidden", tabId !== "review");
+      document.getElementById("panelToDelete").classList.toggle("hidden", tabId !== "todelete");
+      if (tabId === "performance") { renderMainLeaderChips(); renderPerformance(); }
+      if (tabId === "leader") { renderLeaderChips(); renderLeader(); }
+      if (tabId === "edit") { renderEditLeaderChips(); renderEdit(); }
+      if (tabId === "review") renderReview();
+      if (tabId === "todelete") renderToDelete();
+    }
+
+    function refreshViewsAfterPromotion(toastMsg, switchTab) {
       refreshMetricsLists();
       renderMainLeaderChips();
       renderPerformance();
@@ -2124,6 +2163,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       renderEdit();
       renderReview();
       updateHintBanner();
+      if (switchTab) switchToTab(switchTab);
       if (toastMsg) {
         const toast = document.getElementById("saveToast");
         toast.textContent = toastMsg;
@@ -2134,6 +2174,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     function promoteReviewMetric(metric, variantKey) {
+      if (!metric) return;
+      promotedReviewMetrics = normalizeStringArray(promotedReviewMetrics);
       if (variantKey) {
         soldSelectionChoice = variantKey;
         persistJson(CFG.storage.soldChoice, soldSelectionChoice, "__okrSoldChoiceMem");
@@ -2143,17 +2185,18 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         persistJson(CFG.storage.promotedReview, promotedReviewMetrics, "__okrPromotedReviewMem");
       }
       const onLeader = variantKey ? "Main KPIs, KPI by Leader & Target" : "Main KPIs & Target";
-      refreshViewsAfterPromotion(`Added: ${metric} — ${onLeader}`);
+      refreshViewsAfterPromotion(`Added: ${metric} — ${onLeader}`, "performance");
     }
 
     function clearReviewPromotion(metric, variantKey) {
-      promotedReviewMetrics = promotedReviewMetrics.filter(m => m !== metric);
+      promotedReviewMetrics = normalizeStringArray(promotedReviewMetrics).filter(m => m !== metric);
       persistJson(CFG.storage.promotedReview, promotedReviewMetrics, "__okrPromotedReviewMem");
       if (variantKey && soldSelectionChoice === variantKey) {
         soldSelectionChoice = null;
         try { localStorage.removeItem(CFG.storage.soldChoice); } catch (e) { storageOk = false; }
+        window.__okrSoldChoiceMem = null;
       }
-      refreshViewsAfterPromotion(null);
+      refreshViewsAfterPromotion(null, null);
     }
 
     function setSoldSelectionChoice(key) {
@@ -3646,8 +3689,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }).join("");
       tbody.querySelectorAll("[data-review-promote]").forEach(btn => {
         btn.addEventListener("click", () => {
-          const variantKey = btn.dataset.soldVariant || null;
-          promoteReviewMetric(btn.dataset.reviewPromote, variantKey);
+          try {
+            const variantKey = btn.dataset.soldVariant || null;
+            promoteReviewMetric(btn.dataset.reviewPromote, variantKey);
+          } catch (e) {
+            showSaveToast("Could not add metric — try refreshing the page");
+            console.error(e);
+          }
         });
       });
       tbody.querySelectorAll("[data-review-clear]").forEach(btn => {

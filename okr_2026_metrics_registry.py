@@ -39,8 +39,10 @@ LEADER_ORDER: list[str] = [
 ]
 
 # Leader chip "CAT & Content" includes legacy spreadsheet label "CAT".
+# Leader chip "Marketing" includes legacy spreadsheet label "MKT".
 LEADER_FILTER_GROUPS: dict[str, list[str]] = {
     "CAT & Content": ["CAT", "CAT & Content"],
+    "Marketing": ["Marketing", "MKT"],
 }
 
 
