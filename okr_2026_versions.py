@@ -25,7 +25,7 @@ SNAPSHOTS: dict[str, OkrSnapshot] = {
         date="2026-07-16",
         notes=(
             "First stable checkpoint: interactive dashboard, weekly drill-down, "
-            "PIN-protected Target editing (3963), Jan–Jun 2026 actuals"
+            "PIN-protected Target editing (4351), Jan–Jun 2026 actuals"
         ),
     ),
     "V1": OkrSnapshot(

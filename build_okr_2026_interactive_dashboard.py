@@ -113,7 +113,7 @@ STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
 STORAGE_METRIC_NOTES = "okr2026_metric_notes_v1"
-TARGET_EDIT_PIN = "3963"  # 4-digit PIN to unlock Target tab editing
+TARGET_EDIT_PIN = "4351"  # 4-digit PIN to unlock Target tab editing
 TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
 
 # Snowflake cache keys that differ from current metric display names.
@@ -499,7 +499,7 @@ def _build_payload(
         "monthLabels": MONTH_LABELS,
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
-        "defaultTargetsNote": "Dashboard Target tab defaults · edit in Target tab (PIN 3963)",
+        "defaultTargetsNote": "Dashboard Target tab defaults · edit in Target tab (PIN 4351)",
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
