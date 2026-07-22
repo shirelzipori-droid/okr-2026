@@ -20,11 +20,17 @@
   "Fulfillment & Drive partner|yearly": 499998.0,
   "Turning B stores to A|yearly": 12.0,
   "Avg Units per Order|yearly": 11.9675,
-  "Order Frequency|yearly": 2.475,
+  "Order Frequency|yearly": 2.8275,
   "Penetration Rate|yearly": 15.275,
   "Available Product Selection|yearly": 5195.8333,
   "%Fresh Food / DDE|yearly": 38.5083,
   "IDQ|yearly": 98.2958,
   "UPH >|yearly": 120.85,
-  "DC|yearly": 36.0
+  "DC|yearly": 36.0,
+  "Order Frequency|2026-01": 2.98,
+  "Order Frequency|2026-02": 2.85,
+  "Order Frequency|2026-03": 3.32,
+  "Order Frequency|2026-04": 3.11,
+  "Order Frequency|2026-05": 3.04,
+  "Order Frequency|2026-06": 3.03
 }
