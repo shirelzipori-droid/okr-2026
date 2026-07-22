@@ -121,7 +121,7 @@ MONTH_LABELS = [
 DEFAULT_SELECTED_MONTH_KEYS: tuple[str, ...] = (
     "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
 )
-STORAGE_TARGETS = "okr2026_targets_v2"  # bump when embedded defaults change materially
+STORAGE_TARGETS = "okr2026_targets_v3"  # bump when embedded defaults change materially
 STORAGE_ACTUALS = "okr2026_actuals_v3"
 STORAGE_DC_UNITS = "okr2026_dc_units_v1"
 STORAGE_OWNERS = "okr2026_owners_v1"
@@ -406,6 +406,25 @@ def _default_selected_month_keys(
     return MONTH_KEYS[: last_with_data + 1]
 
 
+def _sync_completed_month_targets_from_actuals(
+    default_targets: dict[str, float | str],
+    actuals: dict[str, list[float | None]],
+    completed_month_keys: list[str],
+) -> None:
+    """Embed target = Snowflake actual for closed months (gap baseline matches performance)."""
+    skip = set(YEARLY_TARGET_METRICS) | set(RATIO_COMPONENT_METRICS) | {"DC"}
+    for month_key in completed_month_keys:
+        if month_key not in MONTH_KEYS:
+            continue
+        idx = MONTH_KEYS.index(month_key)
+        for metric, series in actuals.items():
+            if metric in skip or metric.endswith(">"):
+                continue
+            if idx >= len(series) or series[idx] is None:
+                continue
+            default_targets[f"{metric}|{month_key}"] = float(series[idx])
+
+
 def _build_payload(
     actuals_snow: dict[str, list[float | None]],
     weekly_payload: dict | None = None,
@@ -488,6 +507,9 @@ def _build_payload(
     }
     default_targets = build_default_targets_flat(MONTH_KEYS)
     default_selected_months = _default_selected_month_keys(actuals_snow)
+    _sync_completed_month_targets_from_actuals(
+        default_targets, actuals, list(DEFAULT_SELECTED_MONTH_KEYS),
+    )
     vp_absolute_k, gov_k = _load_cached_vp_aux()
     gap_abs_target_metrics = dict(GAP_ABS_TARGET_METRICS)
     for parent, child in gap_abs_target_metrics.items():
@@ -527,6 +549,7 @@ def _build_payload(
         "monthKeys": MONTH_KEYS,
         "monthLabels": MONTH_LABELS,
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
+        "completedActualAsTargetMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
         "defaultTargetsNote": "Shared targets via Firebase · Save updates link for everyone · PIN 4351",
         "sharedTargetsRawUrl": SHARED_TARGETS_RAW_URL,
@@ -3164,6 +3187,23 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return getTargetValue(metric, monthKey, false);
     }
 
+    function isCompletedActualAsTargetMonth(monthKey) {
+      return (CFG.completedActualAsTargetMonths || []).includes(monthKey);
+    }
+
+    /* Gap + Performance: closed months use actual as target (ignores stale local overrides). */
+    function getGapTarget(metric, monthKey) {
+      if (isYearlyTargetMetric(metric) || isRatioMetric(metric) || isTextMetric(metric)) {
+        return getTarget(metric, monthKey);
+      }
+      if (isCompletedActualAsTargetMonth(monthKey)) {
+        const idx = monthIndex(monthKey);
+        const actual = getActual(metric, idx);
+        if (actual !== null) return actual;
+      }
+      return getTarget(metric, monthKey);
+    }
+
     function getEditTarget(metric, monthKey) {
       if (isYearlyTargetMetric(metric)) return null;
       return getTargetValue(metric, monthKey, true);
@@ -3312,7 +3352,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       for (const mk of ordered) {
         const idx = monthIndex(mk);
         const actual = getActual(metric, idx);
-        const target = getTarget(metric, mk);
+        const target = getGapTarget(metric, mk);
         if (actual === null || target === null) continue;
         actualSum += actual;
         targetSum += target;
@@ -3337,9 +3377,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       for (const mk of ordered) {
         const idx = monthIndex(mk);
         const actual = getActual(metric, idx);
-        const target = getTarget(metric, mk);
+        const target = getGapTarget(metric, mk);
         const wActual = getActual(weightMetric, idx);
-        const wTarget = getTarget(weightMetric, mk);
+        const wTarget = getGapTarget(weightMetric, mk);
         if (actual !== null && wActual !== null && wActual > 0) {
           actualWeightedSum += actual * wActual;
           actualWeightSum += wActual;
@@ -3373,7 +3413,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       for (const mk of ordered) {
         const idx = monthIndex(mk);
         const actual = getActual(metric, idx);
-        const target = getTarget(metric, mk);
+        const target = getGapTarget(metric, mk);
         if (actual === null || target === null) continue;
         actualSum += actual;
         targetSum += target;
@@ -3945,7 +3985,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
               }
               const idx = monthIndex(monthKey);
               const actual = getActual(metric, idx);
-              const target = getTarget(metric, monthKey);
+              const target = getGapTarget(metric, monthKey);
               if (actual === null && !manual && target === null) {
                 return `<td><div class="cell-actual no-actual">—</div></td>`;
               }
@@ -3971,7 +4011,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           : months.map(monthKey => {
           const idx = monthIndex(monthKey);
           const actual = getActual(metric, idx);
-          const target = getTarget(metric, monthKey);
+          const target = getGapTarget(metric, monthKey);
           const override = getActualOverride(metric, monthKey);
           const snow = getSnowflakeActual(metric, idx);
           const actualShown = override !== undefined
