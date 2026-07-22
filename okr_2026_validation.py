@@ -230,8 +230,12 @@ _LOOKER_GOLDEN_GROWTH_ISR = (
     "&Reporting+Region=&Franchise+Name=woltmarket&Country=ISR"
     "&Secondary+Product+Line=supermarket&Lookback+Periods=6&Metric+Area=country"
 )
-# Order Frequency / Penetration / Avg Units — Golden Growth 106613 ONLY.
-# Order Frequency tile = Order Frequency (MART); NOT kpi_data Metrics explore PURCHASE_FREQUENCY.
+_LOOKER_ORDER_FREQUENCY = (
+    "https://looker.wolt.com/explore/wolt_market_dashboards/wolt_market_venue_metrics_aggregated"
+    "?qid=MJFEKNGL4w89OLO5kO5lIl&origin_space=27423&toggle=fil"
+)
+# Order Frequency — WM Venue Metrics Aggregated explore (ISR, Order Frequency field).
+# Penetration / Avg Units — Golden Growth 106613.
 GOLDEN_GROWTH_CLIENTS_NOTE = (
     "Golden Growth 106613 — FTU & Returning Clients (venue visited, country dedup), "
     "ISR woltmarket. FTU / Returning Client Conversion = converted ÷ visited "
@@ -698,7 +702,10 @@ LOOKER_LINKS: dict[str, tuple[str, str]] = {
     "POFR%": ("WM Venue Metrics Aggregated — POFR (ISR)", _LOOKER_POFR_AGGREGATED),
     "Under 45min >": ("WM Venue Metrics Aggregated — Under 45min (ISR)", _LOOKER_UNDER_45_AGGREGATED),
     "Avg Units per Order": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
-    "Order Frequency": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
+    "Order Frequency": (
+        "WM Venue Metrics Aggregated — Order Frequency (ISR)",
+        _LOOKER_ORDER_FREQUENCY,
+    ),
     "Penetration Rate": ("Golden Growth — ISR (106613)", _LOOKER_GOLDEN_GROWTH_ISR),
     "Available Product Selection": (
         "WM Venue Metrics Aggregated — Available Product Selection (ISR)",
