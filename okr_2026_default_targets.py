@@ -3,11 +3,20 @@
 These are the defaults shown in the Target tab. User edits there override
 these values in browser localStorage. Gap and exports should read from the
 built dashboard (CFG.defaultTargets), not from this file directly.
+
+Yearly targets saved in the Target tab live in browser localStorage until
+exported to okr_2026_published_targets.json (Target tab → Publish for sharing).
+That file is merged into defaultTargets at build time so GitHub Pages viewers
+see the same Yearly Target values.
 """
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 SOLD_FROM_SELECTION_TARGET_NAME = "Sold from selection (store level)"
 YEARLY_TARGET_KEY = "yearly"
+PUBLISHED_TARGETS_PATH = Path(__file__).resolve().parent / "okr_2026_published_targets.json"
 
 # Single annual target per metric — key in flat map: f"{metric}|yearly"
 OKR_2026_YEARLY_TARGETS: dict[str, float] = {
@@ -47,9 +56,24 @@ OKR_2026_TARGET_BY_METRIC: dict[str, list[float | None]] = {
 }
 
 
-def build_default_targets_flat(month_keys: list[str]) -> dict[str, float]:
+def load_published_targets() -> dict[str, float | str]:
+    """Targets exported from the dashboard for GitHub Pages (yearly + overrides)."""
+    if not PUBLISHED_TARGETS_PATH.is_file():
+        return {}
+    raw = json.loads(PUBLISHED_TARGETS_PATH.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, float | str] = {}
+    for key, val in raw.items():
+        if key.startswith("_") or val is None or val == "":
+            continue
+        out[str(key)] = val if isinstance(val, str) else float(val)
+    return out
+
+
+def build_default_targets_flat(month_keys: list[str]) -> dict[str, float | str]:
     """Flat map: 'Metric|2026-01' -> value (for embedded dashboard JS)."""
-    out: dict[str, float] = {}
+    out: dict[str, float | str] = {}
     for metric, values in OKR_2026_TARGET_BY_METRIC.items():
         for i, month in enumerate(month_keys):
             if i >= len(values):
@@ -60,4 +84,6 @@ def build_default_targets_flat(month_keys: list[str]) -> dict[str, float]:
             out[f"{metric}|{month}"] = float(v)
     for metric, val in OKR_2026_YEARLY_TARGETS.items():
         out[f"{metric}|{YEARLY_TARGET_KEY}"] = float(val)
+    for key, val in load_published_targets().items():
+        out[key] = val
     return out

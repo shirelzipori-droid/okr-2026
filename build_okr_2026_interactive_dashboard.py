@@ -499,7 +499,7 @@ def _build_payload(
         "monthLabels": MONTH_LABELS,
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
-        "defaultTargetsNote": "Dashboard Target tab defaults · edit in Target tab (PIN 4351)",
+        "defaultTargetsNote": "Dashboard Target tab defaults · yearly via okr_2026_published_targets.json · edit PIN 4351",
         "actuals": actuals,
         "defaultOwners": default_owners,
         "looker": looker,
@@ -923,6 +923,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       background: #059669; border-color: #059669; color: #fff;
     }
     .btn-target-save:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-target-publish {
+      background: #eff6ff; border: 1px solid #93c5fd; color: #1d4ed8;
+      border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 700;
+      cursor: pointer; font-family: var(--font-ui);
+    }
+    .btn-target-publish:hover { background: #dbeafe; border-color: #60a5fa; }
     .target-paste-hint {
       font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4;
     }
@@ -1319,11 +1325,14 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           <span id="targetLockStatus">🔒 Locked — enter PIN to edit</span>
           <button type="button" class="btn-target-lock primary" id="btnUnlockTargets">Enter PIN</button>
           <button type="button" class="btn-target-save hidden" id="btnSaveTargets" disabled>Save targets</button>
+          <button type="button" class="btn-target-publish hidden" id="btnPublishTargets" title="Download yearly targets for GitHub Pages">Publish for sharing</button>
           <button type="button" class="btn-target-lock hidden" id="btnLockTargets">Lock editing</button>
         </div>
         <p class="target-paste-hint hidden" id="targetPasteHint">
           <strong>Bulk paste from Excel:</strong> copy a row of months (Tab-separated) → click the first month cell → Ctrl+V.
           Paste applies through Dec + optional Yearly column. Then click <strong>Save targets</strong>.
+          <br><strong>Share link:</strong> after saving, click <strong>Publish for sharing</strong> → save as
+          <code>okr_2026_published_targets.json</code> in the repo → rebuild &amp; push so others see Yearly Target.
         </p>
       </div>
       <div class="table-scroll">
@@ -1476,6 +1485,46 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       resetTargetSheetDraft();
       applyTargetEditLockState();
       renderEdit();
+      downloadPublishedTargets(false);
+    }
+
+    function collectPublishedYearlyTargets() {
+      flushPendingTargetInputs();
+      const out = {};
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const metrics = editMetricsList.length
+        ? editMetricsList
+        : [...(CFG.mainMetrics || []), ...(CFG.leaderMetrics || [])];
+      metrics.forEach(metric => {
+        if (isRatioMetric(metric)) {
+          const pct = getRatioYearlyTargetPct(metric);
+          if (pct !== null) out[cellKey(metric, yKey)] = pct;
+          return;
+        }
+        const yt = getYearlyTarget(metric);
+        if (yt !== null && yt !== undefined && yt !== "") {
+          out[cellKey(metric, yKey)] = yt;
+        }
+      });
+      return out;
+    }
+
+    function downloadPublishedTargets(fromButton) {
+      const payload = collectPublishedYearlyTargets();
+      const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "okr_2026_published_targets.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      const n = Object.keys(payload).length;
+      const msg = fromButton
+        ? `Downloaded ${n} yearly target(s) — save file in repo & rebuild`
+        : `Targets saved · downloaded ${n} yearly target(s) for sharing`;
+      showSaveToast(msg);
     }
 
     function parsePasteGrid(text) {
@@ -1613,6 +1662,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       if (btnUnlock) btnUnlock.classList.toggle("hidden", !locked);
       if (btnLock) btnLock.classList.toggle("hidden", locked);
+      const btnPublish = document.getElementById("btnPublishTargets");
+      if (btnPublish) btnPublish.classList.toggle("hidden", locked);
       const pasteHint = document.getElementById("targetPasteHint");
       if (pasteHint) pasteHint.classList.toggle("hidden", locked);
       updateTargetSaveButton();
@@ -2727,7 +2778,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function getDefaultTarget(metric, monthKey) {
       const d = (CFG.defaultTargets || {})[cellKey(metric, monthKey)];
       if (d === undefined || d === null || d === "") return null;
-      return Number(d);
+      return isTextMetric(metric) ? String(d) : Number(d);
     }
 
     function updateHintBanner() {
@@ -3953,6 +4004,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     document.getElementById("btnUnlockTargets").addEventListener("click", openTargetPinModal);
     document.getElementById("btnSaveTargets").addEventListener("click", saveTargetSheet);
+    document.getElementById("btnPublishTargets").addEventListener("click", () => downloadPublishedTargets(true));
     document.getElementById("btnLockTargets").addEventListener("click", lockTargetEditing);
     document.getElementById("targetPinCancel").addEventListener("click", closeTargetPinModal);
     document.getElementById("targetPinSubmit").addEventListener("click", submitTargetPin);
