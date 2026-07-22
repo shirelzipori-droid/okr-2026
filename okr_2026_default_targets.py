@@ -56,6 +56,90 @@ OKR_2026_TARGET_BY_METRIC: dict[str, list[float | None]] = {
 }
 
 
+# Weight metric for weighted-average yearly derivation.
+_GAP_WEIGHT_METRIC: dict[str, str] = {
+    "DDE FEE/order": "Orders",
+    "Shrink/DDE FEE": "Orders",
+    "OFL / order (ILS)": "Orders",
+}
+
+# How to derive Yearly Target from the 12-month OKR plan when no explicit override exists.
+# sum = Σ monthly · avg = simple average · weighted_orders = Orders-weighted average
+_YEARLY_DERIVE_MODE: dict[str, str] = {
+    "Orders": "sum",
+    "DDE FEE/order": "weighted_orders",
+    "FTU": "sum",
+    "FTU Conversion": "avg",
+    "Returning Clients": "sum",
+    "Returning Client Conversion": "avg",
+    "PPM%": "avg",
+    "Shrink/DDE FEE": "weighted_orders",
+    "OFL / order (ILS)": "weighted_orders",
+    "VP%": "avg",
+    "Weighted Availability": "avg",
+    "KVI & Promo WA%": "avg",
+    SOLD_FROM_SELECTION_TARGET_NAME: "avg",
+    "POFR%": "avg",
+    "Under 45min >": "avg",
+    "Maintenance costs": "sum",
+    "Fulfillment & Drive partner": "sum",
+    "Turning B stores to A": "sum",
+    "Avg Units per Order": "avg",
+    "Order Frequency": "avg",
+    "Penetration Rate": "avg",
+    "Available Product Selection": "avg",
+    "%Fresh Food / DDE": "avg",
+    "IDQ": "avg",
+    "UPH >": "avg",
+}
+
+
+def _monthly_target_series(metric: str, month_keys: list[str]) -> list[float]:
+    values = OKR_2026_TARGET_BY_METRIC.get(metric, [])
+    out: list[float] = []
+    for i, _mk in enumerate(month_keys):
+        if i >= len(values):
+            break
+        v = values[i]
+        if v is None:
+            continue
+        out.append(float(v))
+    return out
+
+
+def _weighted_by_orders(metric: str, month_keys: list[str]) -> float | None:
+    weights = _monthly_target_series("Orders", month_keys)
+    values = _monthly_target_series(metric, month_keys)
+    n = min(len(weights), len(values))
+    if not n:
+        return None
+    w_sum = sum(weights[:n])
+    if w_sum == 0:
+        return None
+    return sum(values[i] * weights[i] for i in range(n)) / w_sum
+
+
+def build_implicit_yearly_targets(month_keys: list[str]) -> dict[str, float]:
+    """Yearly Target defaults derived from the OKR monthly plan (full-year)."""
+    out: dict[str, float] = {}
+    for metric in OKR_2026_TARGET_BY_METRIC:
+        series = _monthly_target_series(metric, month_keys)
+        if not series:
+            continue
+        mode = _YEARLY_DERIVE_MODE.get(metric, "avg")
+        if mode == "sum":
+            val: float = sum(series)
+        elif mode == "weighted_orders":
+            w = _weighted_by_orders(metric, month_keys)
+            if w is None:
+                continue
+            val = w
+        else:
+            val = sum(series) / len(series)
+        out[f"{metric}|{YEARLY_TARGET_KEY}"] = round(val, 4)
+    return out
+
+
 def load_published_targets() -> dict[str, float | str]:
     """Targets exported from the dashboard for GitHub Pages (yearly + overrides)."""
     if not PUBLISHED_TARGETS_PATH.is_file():
@@ -84,6 +168,8 @@ def build_default_targets_flat(month_keys: list[str]) -> dict[str, float | str]:
             out[f"{metric}|{month}"] = float(v)
     for metric, val in OKR_2026_YEARLY_TARGETS.items():
         out[f"{metric}|{YEARLY_TARGET_KEY}"] = float(val)
+    for key, val in build_implicit_yearly_targets(month_keys).items():
+        out[key] = val
     for key, val in load_published_targets().items():
         out[key] = val
     return out

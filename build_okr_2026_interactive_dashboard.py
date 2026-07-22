@@ -25,6 +25,7 @@ from okr_2026_metrics_registry import (
     MAIN_SHEET_METRICS,
     METRIC_DATA_SOURCE,
     METRIC_WORKFLOW,
+    OKR_METRICS,
 )
 from okr_2026_default_targets import (
     SOLD_FROM_SELECTION_TARGET_NAME,
@@ -154,6 +155,13 @@ REVIEW_PROMOTION_MAIN: list[list[str]] = [
     ["FTU Conversion", "FTU"],
     ["Returning Clients", "FTU Conversion"],
     ["Returning Client Conversion", "Returning Clients"],
+]
+# KPI by Leader — insert after anchor in leader sheet (Marketing / CAT & Content blocks).
+REVIEW_PROMOTION_LEADER: list[list[str]] = [
+    ["FTU", "Order Frequency"],
+    ["Returning Clients", "FTU"],
+    ["FTU Conversion", "Avg Units per Order"],
+    ["Returning Client Conversion", "FTU Conversion"],
 ]
 
 SOURCE_LABEL: dict[str, str] = {
@@ -502,6 +510,8 @@ def _build_payload(
         "approvedLookerExplores": APPROVED_LOOKER_EXPLORES,
         "notCertifiedLookerExplores": _dashboard_not_certified_explores(),
         "reviewPromotionMain": REVIEW_PROMOTION_MAIN,
+        "reviewPromotionLeader": REVIEW_PROMOTION_LEADER,
+        "okrMetricOrder": {r["name"]: i for i, r in enumerate(OKR_METRICS)},
         "reviewMetrics": list(REVIEW_TAB_METRICS),
         "reviewNote": DASHBOARD_SOLD_SELECTION_REVIEW_NOTE,
         "clientGrowthReviewNote": DASHBOARD_CLIENT_GROWTH_REVIEW_NOTE,
@@ -1535,7 +1545,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function applySharedTargetsPayload(raw, silent) {
       const incoming = sanitizeSharedTargetsPayload(raw);
       const legacy = sanitizeSharedTargetsPayload(targets);
-      sharedTargets = { ...incoming, ...legacy };
+      const draft = sanitizeSharedTargetsPayload(targetDraft);
+      /* Local browser saves win over remote poll (GitHub JSON / Firebase). */
+      sharedTargets = { ...incoming, ...legacy, ...draft };
       if (!silent) {
         renderPerformance();
         renderLeader();
@@ -1544,6 +1556,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         updateSummary();
         updateLeaderSummary();
       }
+    }
+
+    function syncSharedTargetsFromLocal() {
+      applySharedTargetsPayload(targets, true);
     }
 
     async function fetchSharedTargetsFallback(silent) {
@@ -1667,10 +1683,12 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       } else if (result.reason === "no_firebase") {
         targets = cloneStore(targetDraft);
         persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+        syncSharedTargetsFromLocal();
         saveAll("Targets saved locally — add okr_2026_firebase_config.json & rebuild", true);
       } else {
         targets = cloneStore(targetDraft);
         persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+        syncSharedTargetsFromLocal();
         saveAll("Targets saved locally — cloud sync failed", true);
       }
       resetTargetSheetDraft();
@@ -2089,6 +2107,13 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
 
     function buildLeaderMetricsList() {
       let out = (CFG.leaderMetrics || []).slice();
+      for (const row of (CFG.reviewPromotionLeader || [])) {
+        const metric = row[0];
+        const after = row[1];
+        if (promotedReviewMetrics.includes(metric)) {
+          out = insertMetricAfter(out, metric, after);
+        }
+      }
       const soldDisplay = CFG.promotedSoldSelectionName;
       const vm = resolveSoldVariantMetric();
       if (vm && promotedReviewMetrics.includes(vm) && !out.includes(soldDisplay)) {
@@ -2184,8 +2209,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         promotedReviewMetrics.push(metric);
         persistJson(CFG.storage.promotedReview, promotedReviewMetrics, "__okrPromotedReviewMem");
       }
-      const onLeader = variantKey ? "Main KPIs, KPI by Leader & Target" : "Main KPIs & Target";
-      refreshViewsAfterPromotion(`Added: ${metric} — ${onLeader}`, "performance");
+      refreshViewsAfterPromotion(`Added: ${metric} — Main KPIs, KPI by Leader & Target`, "leader");
     }
 
     function clearReviewPromotion(metric, variantKey) {
@@ -2279,7 +2303,26 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       if (refreshViews) showPersistToast("Notes saved");
     }
 
-    targets = loadJson(CFG.storage.targets, {}, "__okrTargetsMem");
+    function migrateLegacyTargetsStore() {
+      let current = loadJson(CFG.storage.targets, {}, "__okrTargetsMem");
+      if (Object.keys(current).length) return current;
+      const legacyKeys = ["okr2026_targets_v1", "okr2026_targets_v2"];
+      for (const legacyKey of legacyKeys) {
+        if (legacyKey === CFG.storage.targets) continue;
+        try {
+          const raw = localStorage.getItem(legacyKey);
+          if (!raw) continue;
+          const parsed = JSON.parse(raw);
+          if (parsed && typeof parsed === "object" && Object.keys(parsed).length) {
+            persistJson(CFG.storage.targets, parsed, "__okrTargetsMem");
+            return parsed;
+          }
+        } catch (e) { storageOk = false; }
+      }
+      return current;
+    }
+
+    targets = migrateLegacyTargetsStore();
     actualOverrides = loadJson(CFG.storage.actuals, {}, "__okrActualsMem");
     owners = loadJson(CFG.storage.owners, {}, "__okrOwnersMem");
     metricNotes = loadJson(CFG.storage.metricNotes, {}, "__okrMetricNotesMem");
@@ -2404,6 +2447,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const order = CFG.baseMetrics || CFG.metrics || [];
       const idx = {};
       order.forEach((m, i) => { idx[m] = i; });
+      Object.entries(CFG.okrMetricOrder || {}).forEach(([m, i]) => {
+        if (idx[m] === undefined) idx[m] = i;
+      });
       (CFG.mainMetrics || []).forEach((m, i) => { if (idx[m] === undefined) idx[m] = i; });
       (CFG.leaderMetrics || []).forEach((m, i) => { if (idx[m] === undefined) idx[m] = 100 + i; });
       return (m) => idx[m] !== undefined ? idx[m] : 999;
@@ -2586,10 +2632,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     function getYearlyTarget(metric) {
       if (isRatioMetric(metric)) return null;
       const yKey = CFG.yearlyTargetKey || "yearly";
+      const legacy = getLegacyTarget(metric, yKey);
+      if (legacy !== undefined) return legacy;
       const shared = getSharedTarget(metric, yKey);
       if (shared !== undefined && shared !== null) return shared;
-      const legacy = getLegacyTarget(metric, yKey);
-      if (legacy !== undefined && legacy !== null) return legacy;
       const d = getDefaultTarget(metric, yKey);
       if (d === null || d === undefined || d === "") return null;
       return isTextMetric(metric) ? String(d) : Number(d);
@@ -2604,10 +2650,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         return isTextMetric(metric) ? String(v) : Number(v);
       }
       const yKey = CFG.yearlyTargetKey || "yearly";
+      const legacy = getLegacyTarget(metric, yKey);
+      if (legacy !== undefined) return legacy;
       const shared = getSharedTarget(metric, yKey);
       if (shared !== undefined && shared !== null) return shared;
-      const legacy = getLegacyTarget(metric, yKey);
-      if (legacy !== undefined && legacy !== null) return legacy;
       const d = getDefaultTarget(metric, yKey);
       if (d === null || d === undefined || d === "") return null;
       return isTextMetric(metric) ? String(d) : Number(d);
@@ -2705,10 +2751,10 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         if (v === null || v === "") return null;
         return isTextMetric(metric) ? String(v) : Number(v);
       }
+      const legacy = getLegacyTarget(metric, monthKey);
+      if (legacy !== undefined) return legacy;
       const shared = getSharedTarget(metric, monthKey);
       if (shared !== undefined && shared !== null) return shared;
-      const legacy = getLegacyTarget(metric, monthKey);
-      if (legacy !== undefined && legacy !== null) return legacy;
       return getDefaultTarget(metric, monthKey);
     }
 
@@ -3123,6 +3169,19 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       return getTargetValue(metric, monthKey, true);
     }
 
+    function persistYearlyTargetLocally(metric, storageMonth) {
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      if (storageMonth !== yKey) return;
+      const k = cellKey(metric, storageMonth);
+      if (Object.prototype.hasOwnProperty.call(targetDraft, k)) {
+        const v = targetDraft[k];
+        if (v === null || v === "") delete targets[k];
+        else targets[k] = v;
+      }
+      syncSharedTargetsFromLocal();
+      persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
+    }
+
     function setTargetIdx(idx, monthKey, raw, finalize) {
       if (!isTargetEditUnlocked()) return;
       const metric = metricByIdx(editMetricsList, idx);
@@ -3132,7 +3191,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const trimmed = String(raw).trim();
       if (trimmed === "") {
         const hasBase = getDefaultTarget(metric, storageMonth) !== null
-          || getSharedTarget(metric, storageMonth) !== undefined;
+          || getSharedTarget(metric, storageMonth) !== undefined
+          || Object.prototype.hasOwnProperty.call(targets, k);
         if (hasBase) targetDraft[k] = null;
         else delete targetDraft[k];
       } else if (isTextMetric(metric)) {
@@ -3143,6 +3203,9 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
         targetDraft[k] = normalizeTargetValue(metric, n);
       }
       markTargetSheetDirty();
+      if (finalize && storageMonth === yKey) {
+        persistYearlyTargetLocally(metric, storageMonth);
+      }
     }
 
     function finalizeTargetInput(inp) {
@@ -3675,7 +3738,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           return `<td><div class="cell-actual no-target"><div class="actual-val">${actual === null ? "—" : formatValue(metric, actual)}</div></div></td>`;
         }).join("");
         let action = "";
-        const leaderNote = variantKey ? "Main KPIs + KPI by Leader + Target" : "Main KPIs + Target";
+        const leaderNote = "Main KPIs + KPI by Leader + Target";
         if (isChosen) {
           action = `<button type="button" class="btn btn-muted" data-review-clear="${escAttr(metric)}"${variantKey ? ` data-sold-variant="${escAttr(variantKey)}"` : ""}>Clear selection</button>`
             + `<div class="metric-hint" style="color:#4ade80;margin-top:8px">✓ ${leaderNote}</div>`;
