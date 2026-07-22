@@ -1510,8 +1510,32 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     let firebaseDb = null;
     let firebaseReady = false;
 
+    function getLegacyTarget(metric, monthKey) {
+      const k = cellKey(metric, monthKey);
+      if (!Object.prototype.hasOwnProperty.call(targets, k)) return undefined;
+      const v = targets[k];
+      if (v === null || v === "") return null;
+      return isTextMetric(metric) ? String(v) : Number(v);
+    }
+
+    function sanitizeSharedTargetsPayload(raw) {
+      const out = normalizeSharedTargetsPayload(raw);
+      const yKey = CFG.yearlyTargetKey || "yearly";
+      const ySuffix = "|" + yKey;
+      for (const k of Object.keys(out)) {
+        if (!k.endsWith(ySuffix)) continue;
+        if (out[k] !== 0 && out[k] !== "0") continue;
+        const metric = k.slice(0, -ySuffix.length);
+        if (isYearlySingleCellMetric(metric) || isRatioMetric(metric)) continue;
+        delete out[k];
+      }
+      return out;
+    }
+
     function applySharedTargetsPayload(raw, silent) {
-      sharedTargets = normalizeSharedTargetsPayload(raw);
+      const incoming = sanitizeSharedTargetsPayload(raw);
+      const legacy = sanitizeSharedTargetsPayload(targets);
+      sharedTargets = { ...incoming, ...legacy };
       if (!silent) {
         renderPerformance();
         renderLeader();
@@ -1591,7 +1615,17 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
           if (t !== null && t !== undefined && t !== "") out[cellKey(metric, mk)] = t;
         });
         const yt = getEditYearlyTargetDisplay(metric);
-        if (yt !== null && yt !== undefined && yt !== "") out[cellKey(metric, yKey)] = yt;
+        const yk = cellKey(metric, yKey);
+        if (yt !== null && yt !== undefined && yt !== "") {
+          const explicit = Object.prototype.hasOwnProperty.call(targetDraft, yk)
+            || Object.prototype.hasOwnProperty.call(targets, yk)
+            || Object.prototype.hasOwnProperty.call(sharedTargets, yk);
+          const spuriousZero = (yt === 0 || yt === "0")
+            && !explicit
+            && !isYearlySingleCellMetric(metric)
+            && !isRatioMetric(metric);
+          if (!spuriousZero) out[yk] = yt;
+        }
       });
       return out;
     }
@@ -1607,7 +1641,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       const result = await publishSharedTargets(merged);
       if (result.ok) {
-        targets = {};
+        targets = cloneStore(merged);
         persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
         showSaveToast("Migrated your saved targets to the shared link");
       }
@@ -1627,7 +1661,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       showSaveToast("Saving shared targets…");
       const result = await publishSharedTargets(payload);
       if (result.ok) {
-        targets = {};
+        targets = cloneStore(payload);
         persistJson(CFG.storage.targets, targets, "__okrTargetsMem");
         saveAll("Targets saved — updated for everyone on the link", true);
       } else if (result.reason === "no_firebase") {
@@ -2211,6 +2245,7 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
     migrateRenamedMetricKeys(owners);
     migrateRenamedMetricKeys(metricNotes);
     migrateVendorsTextToNotes();
+    sharedTargets = sanitizeSharedTargetsPayload(targets);
     resetTargetSheetDraft();
     loadDcUnitsStore();
 
@@ -2510,6 +2545,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const yKey = CFG.yearlyTargetKey || "yearly";
       const shared = getSharedTarget(metric, yKey);
       if (shared !== undefined && shared !== null) return shared;
+      const legacy = getLegacyTarget(metric, yKey);
+      if (legacy !== undefined && legacy !== null) return legacy;
       const d = getDefaultTarget(metric, yKey);
       if (d === null || d === undefined || d === "") return null;
       return isTextMetric(metric) ? String(d) : Number(d);
@@ -2526,6 +2563,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       const yKey = CFG.yearlyTargetKey || "yearly";
       const shared = getSharedTarget(metric, yKey);
       if (shared !== undefined && shared !== null) return shared;
+      const legacy = getLegacyTarget(metric, yKey);
+      if (legacy !== undefined && legacy !== null) return legacy;
       const d = getDefaultTarget(metric, yKey);
       if (d === null || d === undefined || d === "") return null;
       return isTextMetric(metric) ? String(d) : Number(d);
@@ -2625,6 +2664,8 @@ HTML_TEMPLATE = r"""<!DOCTYPE html>
       }
       const shared = getSharedTarget(metric, monthKey);
       if (shared !== undefined && shared !== null) return shared;
+      const legacy = getLegacyTarget(metric, monthKey);
+      if (legacy !== undefined && legacy !== null) return legacy;
       return getDefaultTarget(metric, monthKey);
     }
 
