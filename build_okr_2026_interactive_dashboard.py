@@ -127,7 +127,7 @@ STORAGE_OWNERS = "okr2026_owners_v1"
 STORAGE_SOLD_CHOICE = "okr2026_sold_selection_choice_v1"
 STORAGE_PROMOTED_REVIEW = "okr2026_promoted_review_v1"
 STORAGE_METRIC_NOTES = "okr2026_metric_notes_v1"
-TARGET_EDIT_PIN = "4531"  # 4-digit PIN to unlock Target tab editing
+TARGET_EDIT_PIN = "4351"  # 4-digit PIN to unlock Target tab editing
 TARGET_UNLOCK_SESSION_KEY = "okr2026_target_unlocked_v1"
 SHARED_TARGETS_RAW_URL = (
     "https://raw.githubusercontent.com/shirelzipori-droid/okr-2026/main/"
@@ -518,7 +518,7 @@ def _build_payload(
         "monthLabels": MONTH_LABELS,
         "defaultSelectedMonths": list(DEFAULT_SELECTED_MONTH_KEYS),
         "defaultTargets": default_targets,
-        "defaultTargetsNote": "Shared targets via Firebase · Save updates link for everyone · PIN 4531",
+        "defaultTargetsNote": "Shared targets via Firebase · Save updates link for everyone · PIN 4351",
         "sharedTargetsRawUrl": SHARED_TARGETS_RAW_URL,
         "firebase": _load_firebase_config(),
         "actuals": actuals,
